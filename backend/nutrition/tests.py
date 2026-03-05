@@ -4,6 +4,7 @@ Tests for the NutriLogic nutrition app.
 These tests exercise:
 1. The Prolog bridge module (prolog_bridge.py)
 2. The REST API endpoints
+3. Authentication, profile, and recommendation history endpoints
 
 SWI-Prolog must be installed for Prolog bridge tests to pass.
 If it is not available, those tests are skipped automatically.
@@ -13,6 +14,7 @@ import importlib
 import unittest
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -284,3 +286,194 @@ class RecommendBySymptomsAPITests(APITestCase):
         url = reverse("recommend-symptoms")
         response = self.client.post(url, {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+# ---------------------------------------------------------------------------
+# Authentication endpoint tests
+# ---------------------------------------------------------------------------
+
+class RegisterAPITests(APITestCase):
+    """Tests for POST /api/auth/register/."""
+
+    def test_register_valid_user(self):
+        url = reverse("auth-register")
+        payload = {
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "securepass1",
+            "password2": "securepass1",
+        }
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("detail", response.data)
+        self.assertTrue(User.objects.filter(username="testuser").exists())
+
+    def test_register_mismatched_passwords(self):
+        url = reverse("auth-register")
+        payload = {
+            "username": "user2",
+            "password": "securepass1",
+            "password2": "differentpass",
+        }
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_register_duplicate_username(self):
+        User.objects.create_user(username="existing", password="pass1234!")
+        url = reverse("auth-register")
+        payload = {
+            "username": "existing",
+            "password": "securepass1",
+            "password2": "securepass1",
+        }
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_register_missing_fields(self):
+        url = reverse("auth-register")
+        response = self.client.post(url, {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TokenAPITests(APITestCase):
+    """Tests for POST /api/auth/token/ (login)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="tokenuser", password="testpass123")
+
+    def test_obtain_token_valid(self):
+        url = reverse("token-obtain-pair")
+        response = self.client.post(
+            url, {"username": "tokenuser", "password": "testpass123"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+
+    def test_obtain_token_invalid_credentials(self):
+        url = reverse("token-obtain-pair")
+        response = self.client.post(
+            url, {"username": "tokenuser", "password": "wrongpass"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+# ---------------------------------------------------------------------------
+# Profile endpoint tests
+# ---------------------------------------------------------------------------
+
+class ProfileAPITests(APITestCase):
+    """Tests for GET/PATCH /api/profile/."""
+
+    def setUp(self):
+        from nutrition.models import UserProfile
+        self.user = User.objects.create_user(username="profileuser", password="testpass123")
+        self.profile = UserProfile.objects.create(user=self.user)
+        # Obtain JWT token for authentication
+        token_url = reverse("token-obtain-pair")
+        resp = self.client.post(
+            token_url, {"username": "profileuser", "password": "testpass123"}, format="json"
+        )
+        self.token = resp.data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token}")
+
+    def test_get_profile_authenticated(self):
+        url = reverse("profile")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"]["username"], "profileuser")
+
+    def test_get_profile_unauthenticated(self):
+        self.client.credentials()  # clear auth
+        url = reverse("profile")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_patch_profile(self):
+        url = reverse("profile")
+        response = self.client.patch(url, {"age": 30, "county": "Nairobi"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["age"], 30)
+        self.assertEqual(response.data["county"], "Nairobi")
+
+    def test_patch_profile_invalid_activity_level(self):
+        url = reverse("profile")
+        response = self.client.patch(url, {"activity_level": "flying"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+# ---------------------------------------------------------------------------
+# Recommendation history endpoint tests
+# ---------------------------------------------------------------------------
+
+class RecommendationHistoryAPITests(APITestCase):
+    """Tests for GET /api/history/."""
+
+    def setUp(self):
+        from nutrition.models import RecommendationLog, UserProfile
+        self.user = User.objects.create_user(username="histuser", password="testpass123")
+        self.profile = UserProfile.objects.create(user=self.user)
+        RecommendationLog.objects.create(
+            profile=self.profile,
+            condition="anaemia",
+            recommendations=[{"staple": "githeri", "protein": "beans",
+                               "vegetable": "managu", "explanation": "Test"}],
+        )
+        token_url = reverse("token-obtain-pair")
+        resp = self.client.post(
+            token_url, {"username": "histuser", "password": "testpass123"}, format="json"
+        )
+        self.token = resp.data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token}")
+
+    def test_history_returns_200(self):
+        url = reverse("recommendation-history")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["condition"], "anaemia")
+
+    def test_history_unauthenticated(self):
+        self.client.credentials()
+        url = reverse("recommendation-history")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+# ---------------------------------------------------------------------------
+# Authenticated recommendation auto-logging tests
+# ---------------------------------------------------------------------------
+
+class AuthenticatedRecommendLoggingTests(APITestCase):
+    """When a logged-in user hits the recommend endpoints, a log is saved."""
+
+    def setUp(self):
+        from nutrition.models import UserProfile
+        self.user = User.objects.create_user(username="loguser", password="testpass123")
+        UserProfile.objects.create(user=self.user)
+        token_url = reverse("token-obtain-pair")
+        resp = self.client.post(
+            token_url, {"username": "loguser", "password": "testpass123"}, format="json"
+        )
+        self.token = resp.data["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token}")
+
+    @patch(
+        "nutrition.views.prolog_bridge.recommend_meal",
+        return_value=MOCK_RECOMMENDATIONS,
+    )
+    def test_condition_recommendation_creates_log(self, _mock):
+        from nutrition.models import RecommendationLog
+        url = reverse("recommend-condition")
+        self.client.post(url, {"condition": "anaemia"}, format="json")
+        self.assertEqual(RecommendationLog.objects.filter(profile__user=self.user).count(), 1)
+
+    @patch(
+        "nutrition.views.prolog_bridge.get_recommendation",
+        return_value=MOCK_RECOMMENDATIONS,
+    )
+    def test_symptom_recommendation_creates_log(self, _mock):
+        from nutrition.models import RecommendationLog
+        url = reverse("recommend-symptoms")
+        self.client.post(url, {"symptoms": ["fatigue", "pale_skin"]}, format="json")
+        self.assertEqual(RecommendationLog.objects.filter(profile__user=self.user).count(), 1)
