@@ -1,0 +1,4 @@
+/* Base reset – App.css handles the rest */
+*, *::before, *::after {
+  box-sizing: border-box;
+}

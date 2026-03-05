@@ -1,0 +1,416 @@
+/* NutriLogic – Global Styles */
+
+:root {
+  --green-dark: #1a6b3c;
+  --green-mid: #2d9e5f;
+  --green-light: #e8f7ef;
+  --red-kenya: #bb0000;
+  --text-dark: #1a1a1a;
+  --text-mid: #444;
+  --text-light: #777;
+  --bg: #f5f7f5;
+  --card-bg: #ffffff;
+  --border: #dde8e3;
+  --radius: 10px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text-dark);
+  line-height: 1.6;
+}
+
+/* ── Layout ────────────────────────────────────────────────────────────── */
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  width: 100%;
+}
+
+.footer {
+  background: var(--green-dark);
+  color: #fff;
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.85rem;
+}
+
+/* ── Navbar ────────────────────────────────────────────────────────────── */
+
+.navbar {
+  background: var(--green-dark);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  height: 60px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-icon {
+  font-size: 1.5rem;
+}
+
+.brand-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.brand-tagline {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-left: 4px;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
+.nav-links {
+  list-style: none;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.nav-link {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.nav-link.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── Card ──────────────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.5rem;
+}
+
+.card h2 {
+  color: var(--green-dark);
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: var(--text-light);
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Dashboard ─────────────────────────────────────────────────────────── */
+
+.hero {
+  background: linear-gradient(135deg, var(--green-dark), var(--green-mid));
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 2.5rem 2rem;
+  margin-bottom: 1.75rem;
+  box-shadow: var(--shadow);
+}
+
+.hero h1 {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.hero p {
+  max-width: 680px;
+  opacity: 0.9;
+  line-height: 1.7;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.feature-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.feature-icon {
+  font-size: 2.5rem;
+}
+
+.feature-card h3 {
+  color: var(--green-dark);
+}
+
+.arch-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.5rem;
+}
+
+.arch-list li {
+  padding-left: 1.25rem;
+  position: relative;
+  color: var(--text-mid);
+}
+
+.arch-list li::before {
+  content: "▸";
+  color: var(--green-mid);
+  position: absolute;
+  left: 0;
+}
+
+/* ── Table ─────────────────────────────────────────────────────────────── */
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+thead {
+  background: var(--green-light);
+}
+
+th {
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  color: var(--green-dark);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+
+td {
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+tr:hover td {
+  background: var(--green-light);
+}
+
+/* ── Form ──────────────────────────────────────────────────────────────── */
+
+.mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.mode-toggle button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--text-mid);
+  transition: background 0.2s, color 0.2s;
+}
+
+.mode-toggle button.active {
+  background: var(--green-dark);
+  color: #fff;
+  border-color: var(--green-dark);
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.form-group select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #fff;
+  max-width: 360px;
+}
+
+.symptoms-grid {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+.symptoms-grid legend {
+  font-weight: 600;
+  color: var(--text-mid);
+  padding: 0 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-mid);
+}
+
+.checkbox-label input {
+  accent-color: var(--green-mid);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+
+.btn-primary {
+  background: var(--green-dark);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  align-self: flex-start;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--green-mid);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Results ───────────────────────────────────────────────────────────── */
+
+.results {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.25rem;
+}
+
+.results h3 {
+  color: var(--green-dark);
+  margin-bottom: 1rem;
+}
+
+.meal-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.meal-card {
+  background: var(--green-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+.meal-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.meal-tag {
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.meal-tag.staple {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.meal-tag.protein {
+  background: #fde8e8;
+  color: #a02828;
+}
+
+.meal-tag.vegetable {
+  background: #d4edda;
+  color: #155724;
+}
+
+.explanation {
+  font-size: 0.85rem;
+  color: var(--text-mid);
+  font-style: italic;
+}
+
+/* ── Status messages ───────────────────────────────────────────────────── */
+
+.status-msg {
+  padding: 1rem;
+  border-radius: 6px;
+  color: var(--text-mid);
+}
+
+.status-msg.error {
+  background: #fdecea;
+  color: #c0392b;
+  border: 1px solid #f5c6cb;
+}
