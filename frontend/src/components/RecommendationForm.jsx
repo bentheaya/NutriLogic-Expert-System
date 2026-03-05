@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import { recommendByCondition, recommendBySymptoms } from "../api/nutrilogicApi";
 
 const CONDITIONS = [
@@ -32,6 +33,7 @@ const SYMPTOMS = [
 ];
 
 export default function RecommendationForm() {
+  const { accessToken } = useAuth();
   const [mode, setMode] = useState("condition"); // "condition" | "symptoms"
   const [condition, setCondition] = useState("healthy");
   const [selectedSymptoms, setSelectedSymptoms] = useState([]);
@@ -53,14 +55,14 @@ export default function RecommendationForm() {
     try {
       let data;
       if (mode === "condition") {
-        data = await recommendByCondition(condition);
+        data = await recommendByCondition(condition, accessToken);
         setResults({ label: `Condition: ${condition}`, ...data });
       } else {
         if (selectedSymptoms.length === 0) {
           setError("Please select at least one symptom.");
           return;
         }
-        data = await recommendBySymptoms(selectedSymptoms);
+        data = await recommendBySymptoms(selectedSymptoms, accessToken);
         setResults({ label: `Symptoms: ${selectedSymptoms.join(", ")}`, ...data });
       }
     } catch (err) {
@@ -73,6 +75,9 @@ export default function RecommendationForm() {
   return (
     <section className="card">
       <h2>Get Personalised Meal Recommendations</h2>
+      {accessToken && (
+        <p className="subtitle">✅ Logged in — your recommendations will be saved to history.</p>
+      )}
 
       {/* Mode toggle */}
       <div className="mode-toggle">
