@@ -29,9 +29,10 @@ export default function Dashboard({ onNavigate }) {
       <div className="hero">
         <h1>NutriLogic Expert System</h1>
         <p>
-          A hybrid Neuro-Symbolic Expert System for personalised nutrition and fitness in
-          Kenya. Combining symbolic logic (Prolog) with modern web technology to deliver
-          culturally-sensitive, explainable health recommendations.
+          A hybrid Neuro-Symbolic Expert System for personalised nutrition and
+          fitness in Kenya. Combining symbolic logic (Prolog) with modern web
+          technology to deliver culturally-sensitive, explainable health
+          recommendations.
         </p>
       </div>
 
@@ -58,22 +59,25 @@ export default function Dashboard({ onNavigate }) {
             <strong>Frontend:</strong> ReactJS + Vite — responsive dashboard
           </li>
           <li>
-            <strong>Backend:</strong> Django (Python) — authentication, PostgreSQL
-            storage, REST API gateway
+            <strong>Backend:</strong> Django (Python) — authentication,
+            PostgreSQL storage, REST API gateway
           </li>
           <li>
-            <strong>Expert Core:</strong> SWI-Prolog — backward chaining inference engine
-            with explainable recommendations
+            <strong>Expert Core:</strong> SWI-Prolog — backward chaining
+            inference engine with explainable recommendations
           </li>
           <li>
-            <strong>Bridge:</strong> pyswip — integrates Django with the Prolog engine
+            <strong>Bridge:</strong> pyswip — integrates Django with the Prolog
+            engine
           </li>
           <li>
-            <strong>Knowledge Base:</strong> MOH 2025 Kenya Nutrient Profile Model covering
-            Hypertension, Type 2 Diabetes, Anaemia, and micronutrient deficiencies
+            <strong>Knowledge Base:</strong> MOH 2025 Kenya Nutrient Profile
+            Model covering Hypertension, Type 2 Diabetes, Anaemia, and
+            micronutrient deficiencies
           </li>
         </ul>
       </div>
     </div>
   );
+  // testing
 }
