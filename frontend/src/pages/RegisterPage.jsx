@@ -6,9 +6,11 @@
  */
 
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { registerUser } from "../api/nutrilogicApi";
 
 export default function RegisterPage({ onNavigate }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -35,11 +37,25 @@ export default function RegisterPage({ onNavigate }) {
     try {
       const data = await registerUser(form);
       setSuccess(data.detail || "Account created! You can now log in.");
-      setTimeout(() => onNavigate("login"), 2000);
+      setTimeout(() => {
+        if (onNavigate) {
+          onNavigate("login");
+        } else {
+          navigate("/login");
+        }
+      }, 2000);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handleLoginClick() {
+    if (onNavigate) {
+      onNavigate("login");
+    } else {
+      navigate("/login");
     }
   }
 
@@ -106,9 +122,9 @@ export default function RegisterPage({ onNavigate }) {
         </form>
         <p className="auth-switch">
           Already have an account?{" "}
-          <button className="link-btn" onClick={() => onNavigate("login")}>
+          <Link to="/login" className="link-btn" onClick={handleLoginClick}>
             Sign In
-          </button>
+          </Link>
         </p>
       </div>
     </div>

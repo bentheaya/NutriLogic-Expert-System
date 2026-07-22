@@ -2,15 +2,20 @@
  * LoginPage.jsx
  * -------------
  * Allows an existing user to log in with username + password.
- * On success, stores tokens via AuthContext and redirects to the dashboard.
+ * On success, stores tokens via AuthContext and redirects to original page or dashboard.
  */
 
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { obtainToken } from "../api/nutrilogicApi";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage({ onNavigate }) {
   const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || "/";
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -23,11 +28,23 @@ export default function LoginPage({ onNavigate }) {
     try {
       const { access, refresh } = await obtainToken(username, password);
       login(access, refresh);
-      onNavigate("dashboard");
+      if (onNavigate) {
+        onNavigate("dashboard");
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handleRegisterClick() {
+    if (onNavigate) {
+      onNavigate("register");
+    } else {
+      navigate("/register");
     }
   }
 
@@ -66,9 +83,9 @@ export default function LoginPage({ onNavigate }) {
         </form>
         <p className="auth-switch">
           Don&apos;t have an account?{" "}
-          <button className="link-btn" onClick={() => onNavigate("register")}>
+          <Link to="/register" className="link-btn" onClick={handleRegisterClick}>
             Register
-          </button>
+          </Link>
         </p>
       </div>
     </div>

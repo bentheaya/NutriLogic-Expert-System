@@ -63,6 +63,16 @@
 | Schema artifact | Generated `backend/openapi-schema.yaml` contract specification |
 | OpenAPI test suite | Added `OpenApiSchemaTests` verifying schema/swagger/redoc HTTP 200 responses |
 
+### P2 — React Router Single-Page Application Navigation
+
+| Item | Fix |
+|------|-----|
+| `react-router-dom` dependency | Installed and configured `react-router-dom` in `package.json` |
+| Client-side routing | Replaced manual `activePage` state with `BrowserRouter`, `Routes`, and `Route` |
+| Deep linking | URLs map 1:1 (`/`, `/foods`, `/recommend`, `/login`, `/register`, `/profile`, `/history`) |
+| Protected route guard | Added `ProtectedRoute` component redirecting unauthenticated users to `/login` |
+| Navigation UX | `Navbar` uses `NavLink` with `active` state; `Dashboard`/`LoginPage`/`RegisterPage` use `useNavigate` |
+
 ## Behaviour notes
 
 - Invalid food **group** path params that are not in the domain whitelist now return **400** (previously could 404 after an empty Prolog query). Valid groups with zero foods still **404**.
@@ -75,16 +85,16 @@
 |-------------------|-----------------|--------|-------|
 | Backend Tests | `python manage.py test nutrition` | **PASSED (53/53 tests)** | All security, domain validation, auth, bridge, and OpenAPI schema tests pass cleanly. |
 | DB Migrations | `python manage.py showmigrations` | **PASSED** | `0002_recommendationlog_indexes` applied cleanly. |
-| Frontend Build | `npm run build` | **PASSED** | Vite production bundle generated without errors. |
-| Frontend Lint | `npm run lint` | **PASSED (0 errors)** | Resolved unused var & fast refresh export warning in AuthContext. |
+| Frontend Build | `npm run build` | **PASSED** | Vite production bundle generated cleanly with React Router chunks. |
+| Frontend Lint | `npm run lint` | **PASSED (0 errors)** | 0 errors across all React components and router integration. |
 | OpenAPI Generator | `manage.py spectacular` | **PASSED** | Generated `openapi-schema.yaml` without warnings or collisions. |
 | Container Setup | `docker-compose` config | **VERIFIED** | Valid docker-compose & Dockerfile configurations for full stack deployment. |
 
 ## Follow-ups (not in this pass)
 
-- Step 3: React Router deep linking
 - Isolating Prolog in a sidecar process for multi-thread ASGI workers
 - Using profile metrics inside inference (when project scales)
+
 
 
 

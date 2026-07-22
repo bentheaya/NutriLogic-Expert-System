@@ -4,14 +4,18 @@
  * Landing page for NutriLogic: shows a summary and quick-access cards.
  */
 
+import { useNavigate } from "react-router-dom";
+
 export default function Dashboard({ onNavigate }) {
+  const navigate = useNavigate();
+
   const cards = [
     {
       icon: "🥘",
       title: "Food Knowledge Base",
       description:
         "Browse 20+ catalogued Kenyan foods with nutritional data based on MOH 2025 Kenya Nutrient Profile Model.",
-      action: "foods",
+      path: "/foods",
       actionLabel: "Browse Foods",
     },
     {
@@ -19,10 +23,18 @@ export default function Dashboard({ onNavigate }) {
       title: "AI Recommendations",
       description:
         "Get personalised meal recommendations powered by SWI-Prolog backward chaining inference.",
-      action: "recommend",
+      path: "/recommend",
       actionLabel: "Get Recommendations",
     },
   ];
+
+  function handleAction(path) {
+    if (onNavigate) {
+      onNavigate(path.replace("/", "") || "dashboard");
+    } else {
+      navigate(path);
+    }
+  }
 
   return (
     <div className="page dashboard">
@@ -38,13 +50,13 @@ export default function Dashboard({ onNavigate }) {
 
       <div className="card-grid">
         {cards.map((card) => (
-          <div className="feature-card" key={card.action}>
+          <div className="feature-card" key={card.path}>
             <div className="feature-icon">{card.icon}</div>
             <h3>{card.title}</h3>
             <p>{card.description}</p>
             <button
               className="btn-primary"
-              onClick={() => onNavigate(card.action)}
+              onClick={() => handleAction(card.path)}
             >
               {card.actionLabel}
             </button>
@@ -56,11 +68,11 @@ export default function Dashboard({ onNavigate }) {
         <h2>System Architecture</h2>
         <ul className="arch-list">
           <li>
-            <strong>Frontend:</strong> ReactJS + Vite — responsive dashboard
+            <strong>Frontend:</strong> ReactJS + Vite + React Router — responsive SPA
           </li>
           <li>
             <strong>Backend:</strong> Django (Python) — authentication,
-            PostgreSQL storage, REST API gateway
+            PostgreSQL storage, REST API gateway, OpenAPI 3.0
           </li>
           <li>
             <strong>Expert Core:</strong> SWI-Prolog — backward chaining

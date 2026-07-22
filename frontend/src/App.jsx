@@ -1,42 +1,46 @@
-import { useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
-import { AuthProvider, useAuth } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { AuthProvider } from "./context/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import FoodsPage from "./pages/FoodsPage";
-import RecommendPage from "./pages/RecommendPage";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import ProfilePage from "./pages/ProfilePage";
 import HistoryPage from "./pages/HistoryPage";
+import LoginPage from "./pages/LoginPage";
+import ProfilePage from "./pages/ProfilePage";
+import RecommendPage from "./pages/RecommendPage";
+import RegisterPage from "./pages/RegisterPage";
 
 function AppInner() {
-  const [activePage, setActivePage] = useState("dashboard");
-  const { user } = useAuth();
-
-  function renderPage() {
-    switch (activePage) {
-      case "foods":
-        return <FoodsPage />;
-      case "recommend":
-        return <RecommendPage />;
-      case "login":
-        return <LoginPage onNavigate={setActivePage} />;
-      case "register":
-        return <RegisterPage onNavigate={setActivePage} />;
-      case "profile":
-        return user ? <ProfilePage /> : <LoginPage onNavigate={setActivePage} />;
-      case "history":
-        return user ? <HistoryPage /> : <LoginPage onNavigate={setActivePage} />;
-      default:
-        return <Dashboard onNavigate={setActivePage} />;
-    }
-  }
-
   return (
     <div className="app">
-      <Navbar activePage={activePage} onNavigate={setActivePage} />
-      <main className="main-content">{renderPage()}</main>
+      <Navbar />
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/foods" element={<FoodsPage />} />
+          <Route path="/recommend" element={<RecommendPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <HistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
       <footer className="footer">
         <p>NutriLogic &copy; 2025 — MOH Kenya Nutrient Profile Model</p>
       </footer>
