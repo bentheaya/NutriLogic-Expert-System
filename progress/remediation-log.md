@@ -42,6 +42,17 @@
 | Domain lists inline | `constants/domain.js` |
 | Dead `// testing` comment | Removed |
 
+### P2 — Ops, Infrastructure & CI
+
+| Item | Fix |
+|------|-----|
+| Dockerfile (Backend) | Multi-stage image with SWI-Prolog (`swi-prolog`), non-root user, Gunicorn |
+| Dockerfile (Frontend) | Multi-stage build (Node 20 -> Nginx alpine static host with SPA proxying) |
+| docker-compose.yml | Full-stack orchestration (PostgreSQL 16, Django API, Nginx React frontend) |
+| GitHub Actions CI | `.github/workflows/ci.yml` running backend tests & frontend lint/build on push/PR |
+| Dynamic Prolog KB path | `PROLOG_KB_PATH` environment variable override in `settings.py` |
+| Native SWI term bridge | `prolog_bridge.py` supports both Functor `.args` and string term parsing |
+
 ## Behaviour notes
 
 - Invalid food **group** path params that are not in the domain whitelist now return **400** (previously could 404 after an empty Prolog query). Valid groups with zero foods still **404**.
@@ -52,16 +63,17 @@
 
 | Verification Area | Suite / Command | Status | Notes |
 |-------------------|-----------------|--------|-------|
-| Backend Tests | `python manage.py test nutrition` | **PASSED (50/50 tests)** | All security, domain validation, auth, and bridge tests pass cleanly. |
+| Backend Tests | `python manage.py test nutrition` | **PASSED (50/50 tests)** | All security, domain validation, auth, and bridge tests pass cleanly against live SWI-Prolog engine. |
 | DB Migrations | `python manage.py showmigrations` | **PASSED** | `0002_recommendationlog_indexes` applied cleanly. |
 | Frontend Build | `npm run build` | **PASSED** | Vite production bundle generated without errors. |
 | Frontend Lint | `npm run lint` | **PASSED (0 errors)** | Resolved unused var & fast refresh export warning in AuthContext. |
+| Container Setup | `docker-compose` config | **VERIFIED** | Valid docker-compose & Dockerfile configurations for full stack deployment. |
 
 ## Follow-ups (not in this pass)
 
-- React Router deep linking
-- Docker / CI pipeline
-- OpenAPI schema
+- Step 2: OpenAPI / Swagger schema (`drf-spectacular`)
+- Step 3: React Router deep linking
 - Isolating Prolog in a sidecar process for multi-thread ASGI workers
-- Using profile metrics inside inference (product change)
+- Using profile metrics inside inference (when project scales)
+
 

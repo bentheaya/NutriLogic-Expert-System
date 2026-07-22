@@ -19,7 +19,8 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Path to the SWI-Prolog knowledge base
-PROLOG_KB_PATH = BASE_DIR.parent / "prolog" / "kb.pl"
+_env_kb = os.environ.get("PROLOG_KB_PATH")
+PROLOG_KB_PATH = Path(_env_kb) if _env_kb else BASE_DIR.parent / "prolog" / "kb.pl"
 
 
 def _env_bool(name: str, default: bool) -> bool:

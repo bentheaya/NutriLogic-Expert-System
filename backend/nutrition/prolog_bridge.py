@@ -142,13 +142,30 @@ def _micronutrient_row_to_dict(row: dict) -> dict:
     }
 
 
-def _meal_term_to_dict(meal_term, explanation: str) -> dict:
-    """Convert a Prolog ``meal(Staple, Protein, Vegetable)`` functor to a dict."""
-    args = meal_term.args
+def _meal_term_to_dict(meal_term: Any, explanation: str) -> dict:
+    """Convert a Prolog ``meal(Staple, Protein, Vegetable)`` functor or string representation to a dict."""
+    if hasattr(meal_term, "args") and len(meal_term.args) >= 3:
+        staple = _atom(meal_term.args[0])
+        protein = _atom(meal_term.args[1])
+        vegetable = _atom(meal_term.args[2])
+    else:
+        raw_str = str(meal_term).strip()
+        match = re.match(
+            r"^meal\(\s*([^,\s()]+)\s*,\s*([^,\s()]+)\s*,\s*([^,\s()]+)\s*\)$",
+            raw_str,
+        )
+        if match:
+            staple, protein, vegetable = match.groups()
+            staple = _atom(staple)
+            protein = _atom(protein)
+            vegetable = _atom(vegetable)
+        else:
+            raise ValueError(f"Unexpected meal term format: {meal_term!r}")
+
     return {
-        "staple": _atom(args[0]),
-        "protein": _atom(args[1]),
-        "vegetable": _atom(args[2]),
+        "staple": staple,
+        "protein": protein,
+        "vegetable": vegetable,
         "explanation": explanation,
     }
 

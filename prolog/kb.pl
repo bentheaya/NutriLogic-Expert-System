@@ -147,6 +147,7 @@ suitable_for(avocado, type2_diabetes).
 
 suitable_for(sweet_potato, healthy).
 suitable_for(sweet_potato, vitA_deficiency).
+suitable_for(sweet_potato, hypertension).
 
 suitable_for(mango, healthy).
 suitable_for(mango, vitA_deficiency).
@@ -155,6 +156,7 @@ suitable_for(egg, healthy).
 suitable_for(egg, anaemia).
 
 suitable_for(arrow_roots, type2_diabetes).
+suitable_for(arrow_roots, hypertension).
 suitable_for(githeri, healthy).
 
 % Bodybuilding suitability
@@ -226,6 +228,8 @@ condition_for_deficiency(calcium_deficiency, rickets).
 % -----------------------------------------------------
 % MEAL RECOMMENDATION RULE
 % -----------------------------------------------------
+
+:- discontiguous recommend_meal/3.
 
 recommend_meal(Condition, meal(Staple, Protein, Vegetable), Explanation) :-
 

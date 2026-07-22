@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: nutrilogic-db
+    environment:
+      POSTGRES_DB: nutrilogic_db
+      POSTGRES_USER: nutrilogic_user
+      POSTGRES_PASSWORD: nutrilogic_secret_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nutrilogic_user -d nutrilogic_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: nutrilogic-backend
+    environment:
+      DJANGO_DEBUG: "False"
+      DJANGO_SECRET_KEY: "docker-prod-secret-key-change-in-env-production"
+      DATABASE_URL: "postgres://nutrilogic_user:nutrilogic_secret_password@db:5432/nutrilogic_db"
+      DJANGO_ALLOWED_HOSTS: "localhost 127.0.0.1 backend frontend"
+      PROLOG_KB_PATH: "/app/prolog/kb.pl"
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             gunicorn --bind 0.0.0.0:8000 --workers 2 --timeout 60 nutrilogic.wsgi:application"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nutrilogic-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

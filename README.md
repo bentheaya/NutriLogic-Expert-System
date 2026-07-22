@@ -71,6 +71,19 @@ npm run dev
 
 Dev server: `http://localhost:5173` (proxies `/api` → Django).
 
+## Docker Compose Setup
+
+Run the full stack (PostgreSQL + Django API with SWI-Prolog + React Frontend Nginx) with Docker Compose:
+
+```bash
+docker-compose up --build
+```
+
+- Frontend SPA: `http://localhost:80`
+- Backend API: `http://localhost:8000/api/`
+- Health Probe: `http://localhost:8000/api/health/`
+
+
 ## Key API routes
 
 | Method | Path | Auth |
