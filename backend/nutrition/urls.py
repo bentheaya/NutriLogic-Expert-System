@@ -1,3 +1,8 @@
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 from django.urls import path
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import AnonRateThrottle
@@ -17,9 +22,24 @@ class AllowAnyTokenRefreshView(TokenRefreshView):
     throttle_classes = [_RefreshThrottle]
 
 
+class PublicSpectacularAPIView(SpectacularAPIView):
+    permission_classes = [AllowAny]
+
+
+class PublicSpectacularSwaggerView(SpectacularSwaggerView):
+    permission_classes = [AllowAny]
+
+
+class PublicSpectacularRedocView(SpectacularRedocView):
+    permission_classes = [AllowAny]
+
+
 urlpatterns = [
-    # Ops
+    # Ops & Documentation
     path("health/", views.health, name="health"),
+    path("schema/", PublicSpectacularAPIView.as_view(), name="schema"),
+    path("docs/", PublicSpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("redoc/", PublicSpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     # Food endpoints
     path("foods/", views.food_list, name="food-list"),
     path("foods/<str:group>/", views.food_by_group, name="food-by-group"),

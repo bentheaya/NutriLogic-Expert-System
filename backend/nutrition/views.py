@@ -1,4 +1,5 @@
-from rest_framework import status
+from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -32,6 +33,78 @@ class NutriLogicTokenObtainPairView(TokenObtainPairView):
     throttle_classes = [AuthRateThrottle]
 
 
+_FoodItemListSerializer = inline_serializer(
+    "FoodItemList",
+    fields={
+        "name": serializers.CharField(),
+        "food_group": serializers.CharField(),
+        "calories_per_100g": serializers.FloatField(),
+        "protein_g": serializers.FloatField(),
+        "carbs_g": serializers.FloatField(),
+        "fat_g": serializers.FloatField(),
+        "fibre_g": serializers.FloatField(),
+    },
+    many=True,
+)
+
+_MicronutrientSerializer = inline_serializer(
+    "MicronutrientProfile",
+    fields={
+        "food": serializers.CharField(),
+        "iron_mg": serializers.FloatField(),
+        "calcium_mg": serializers.FloatField(),
+        "zinc_mg": serializers.FloatField(),
+        "vitA_ug": serializers.FloatField(),
+        "vitC_mg": serializers.FloatField(),
+        "folate_ug": serializers.FloatField(),
+    },
+)
+
+_MealRecommendationSerializer = inline_serializer(
+    "MealRecommendationList",
+    fields={
+        "staple": serializers.CharField(),
+        "protein": serializers.CharField(),
+        "vegetable": serializers.CharField(),
+        "explanation": serializers.CharField(),
+    },
+    many=True,
+)
+
+_RecommendationResponseSerializer = inline_serializer(
+    "RecommendationResponse",
+    fields={
+        "condition": serializers.CharField(required=False),
+        "symptoms": serializers.ListField(child=serializers.CharField(), required=False),
+        "deficiency": serializers.CharField(required=False),
+        "recommendations": _MealRecommendationSerializer,
+    },
+)
+
+
+@extend_schema(
+    summary="Health Probe",
+    description="Liveness and readiness check verifying Database and SWI-Prolog engine availability.",
+    responses={
+        200: inline_serializer(
+            "HealthStatusOk",
+            fields={
+                "status": serializers.CharField(),
+                "database": serializers.CharField(),
+                "prolog": serializers.CharField(),
+            },
+        ),
+        503: inline_serializer(
+            "HealthStatusDegraded",
+            fields={
+                "status": serializers.CharField(),
+                "database": serializers.CharField(),
+                "prolog": serializers.CharField(),
+            },
+        ),
+    },
+    tags=["System"],
+)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health(request):
@@ -44,6 +117,13 @@ def health(request):
     return Response(payload, status=code)
 
 
+@extend_schema(
+    operation_id="foods_list_all",
+    summary="List Foods",
+    description="Return all Kenyan foods stored in the SWI-Prolog knowledge base.",
+    responses={200: _FoodItemListSerializer},
+    tags=["Foods"],
+)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def food_list(request):
@@ -55,6 +135,13 @@ def food_list(request):
     return Response(foods)
 
 
+@extend_schema(
+    operation_id="foods_filter_by_group",
+    summary="Filter Foods by Group",
+    description="Return foods filtered by group (e.g., vegetables, legumes, fish).",
+    responses={200: _FoodItemListSerializer},
+    tags=["Foods"],
+)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def food_by_group(request, group):
@@ -75,6 +162,12 @@ def food_by_group(request, group):
     return Response(foods)
 
 
+@extend_schema(
+    summary="Get Food Micronutrients",
+    description="Return micronutrient breakdown (iron, calcium, vitA, vitC, etc.) for a specific food.",
+    responses={200: _MicronutrientSerializer},
+    tags=["Foods"],
+)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def food_micronutrients(request, food_name):
@@ -95,6 +188,13 @@ def food_micronutrients(request, food_name):
     return Response(data)
 
 
+@extend_schema(
+    summary="Recommend Meals by Condition",
+    description="Run Prolog recommend_meal/3 rules for a given health condition (e.g., hypertension, type2_diabetes). Logs history if authenticated.",
+    request=RecommendByConditionSerializer,
+    responses={200: _RecommendationResponseSerializer},
+    tags=["Recommendations"],
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([RecommendRateThrottle])
@@ -119,6 +219,13 @@ def recommend_by_condition(request):
     return Response(payload)
 
 
+@extend_schema(
+    summary="Recommend Meals by Symptoms",
+    description="Backward-chain Prolog rules to diagnose nutrient deficiencies from symptoms and return meal recommendations.",
+    request=RecommendBySymptomsSerializer,
+    responses={200: _RecommendationResponseSerializer},
+    tags=["Recommendations"],
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([RecommendRateThrottle])
@@ -148,6 +255,18 @@ def recommend_by_symptoms(request):
 # Authentication
 # ---------------------------------------------------------------------------
 
+@extend_schema(
+    summary="User Registration",
+    description="Register a new user account and initialize a user profile.",
+    request=UserRegistrationSerializer,
+    responses={
+        201: inline_serializer(
+            "RegisterSuccessResponse",
+            fields={"detail": serializers.CharField()},
+        ),
+    },
+    tags=["Auth"],
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([AuthRateThrottle])
@@ -173,6 +292,13 @@ def register(request):
 # Profile
 # ---------------------------------------------------------------------------
 
+@extend_schema(
+    summary="User Profile",
+    description="Retrieve or partially update the authenticated user's profile.",
+    request=UserProfileSerializer,
+    responses={200: UserProfileSerializer},
+    tags=["Profile"],
+)
 @api_view(["GET", "PATCH"])
 @permission_classes([IsAuthenticated])
 def profile(request):
@@ -197,6 +323,12 @@ def profile(request):
 # Recommendation history
 # ---------------------------------------------------------------------------
 
+@extend_schema(
+    summary="Recommendation History",
+    description="Retrieve the last 20 recommendation logs for the authenticated user.",
+    responses={200: RecommendationLogSerializer(many=True)},
+    tags=["History"],
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def recommendation_history(request):

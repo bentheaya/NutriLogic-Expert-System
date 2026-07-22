@@ -53,6 +53,16 @@
 | Dynamic Prolog KB path | `PROLOG_KB_PATH` environment variable override in `settings.py` |
 | Native SWI term bridge | `prolog_bridge.py` supports both Functor `.args` and string term parsing |
 
+### P2 — OpenAPI / Swagger API Specifications
+
+| Item | Fix |
+|------|-----|
+| `drf-spectacular` integration | Configured `AutoSchema` & `SPECTACULAR_SETTINGS` in `settings.py` |
+| OpenAPI endpoints | Exposed `/api/schema/`, `/api/docs/` (Swagger UI), and `/api/redoc/` |
+| Route annotations | `@extend_schema` with request/response schemas & operation IDs on all views |
+| Schema artifact | Generated `backend/openapi-schema.yaml` contract specification |
+| OpenAPI test suite | Added `OpenApiSchemaTests` verifying schema/swagger/redoc HTTP 200 responses |
+
 ## Behaviour notes
 
 - Invalid food **group** path params that are not in the domain whitelist now return **400** (previously could 404 after an empty Prolog query). Valid groups with zero foods still **404**.
@@ -63,17 +73,18 @@
 
 | Verification Area | Suite / Command | Status | Notes |
 |-------------------|-----------------|--------|-------|
-| Backend Tests | `python manage.py test nutrition` | **PASSED (50/50 tests)** | All security, domain validation, auth, and bridge tests pass cleanly against live SWI-Prolog engine. |
+| Backend Tests | `python manage.py test nutrition` | **PASSED (53/53 tests)** | All security, domain validation, auth, bridge, and OpenAPI schema tests pass cleanly. |
 | DB Migrations | `python manage.py showmigrations` | **PASSED** | `0002_recommendationlog_indexes` applied cleanly. |
 | Frontend Build | `npm run build` | **PASSED** | Vite production bundle generated without errors. |
 | Frontend Lint | `npm run lint` | **PASSED (0 errors)** | Resolved unused var & fast refresh export warning in AuthContext. |
+| OpenAPI Generator | `manage.py spectacular` | **PASSED** | Generated `openapi-schema.yaml` without warnings or collisions. |
 | Container Setup | `docker-compose` config | **VERIFIED** | Valid docker-compose & Dockerfile configurations for full stack deployment. |
 
 ## Follow-ups (not in this pass)
 
-- Step 2: OpenAPI / Swagger schema (`drf-spectacular`)
 - Step 3: React Router deep linking
 - Isolating Prolog in a sidecar process for multi-thread ASGI workers
 - Using profile metrics inside inference (when project scales)
+
 
 

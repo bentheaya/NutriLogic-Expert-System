@@ -1,0 +1,754 @@
+openapi: 3.0.3
+info:
+  title: NutriLogic Expert System API
+  version: 1.0.0
+  description: REST API gateway for SWI-Prolog symbolic nutrition expert system (MOH
+    2025 Kenya Nutrient Profile Model)
+paths:
+  /api/auth/register/:
+    post:
+      operationId: auth_register_create
+      description: Register a new user account and initialize a user profile.
+      summary: User Registration
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterSuccessResponse'
+          description: ''
+  /api/auth/token/:
+    post:
+      operationId: auth_token_create
+      description: Login endpoint that embeds username in the access token.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NutriLogicTokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NutriLogicTokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NutriLogicTokenObtainPairRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create
+      description: Refresh stays public even when DEFAULT_PERMISSION is IsAuthenticated.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/foods/:
+    get:
+      operationId: foods_list_all
+      description: Return all Kenyan foods stored in the SWI-Prolog knowledge base.
+      summary: List Foods
+      tags:
+      - Foods
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FoodItemList'
+          description: ''
+  /api/foods/{food_name}/micronutrients/:
+    get:
+      operationId: foods_micronutrients_retrieve
+      description: Return micronutrient breakdown (iron, calcium, vitA, vitC, etc.)
+        for a specific food.
+      summary: Get Food Micronutrients
+      parameters:
+      - in: path
+        name: food_name
+        schema:
+          type: string
+        required: true
+      tags:
+      - Foods
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MicronutrientProfile'
+          description: ''
+  /api/foods/{group}/:
+    get:
+      operationId: foods_filter_by_group
+      description: Return foods filtered by group (e.g., vegetables, legumes, fish).
+      summary: Filter Foods by Group
+      parameters:
+      - in: path
+        name: group
+        schema:
+          type: string
+        required: true
+      tags:
+      - Foods
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FoodItemList'
+          description: ''
+  /api/health/:
+    get:
+      operationId: health_retrieve
+      description: Liveness and readiness check verifying Database and SWI-Prolog
+        engine availability.
+      summary: Health Probe
+      tags:
+      - System
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatusOk'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatusDegraded'
+          description: ''
+  /api/history/:
+    get:
+      operationId: history_list
+      description: Retrieve the last 20 recommendation logs for the authenticated
+        user.
+      summary: Recommendation History
+      tags:
+      - History
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecommendationLog'
+          description: ''
+  /api/profile/:
+    get:
+      operationId: profile_retrieve
+      description: Retrieve or partially update the authenticated user's profile.
+      summary: User Profile
+      tags:
+      - Profile
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+    patch:
+      operationId: profile_partial_update
+      description: Retrieve or partially update the authenticated user's profile.
+      summary: User Profile
+      tags:
+      - Profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+          description: ''
+  /api/recommend/condition/:
+    post:
+      operationId: recommend_condition_create
+      description: Run Prolog recommend_meal/3 rules for a given health condition
+        (e.g., hypertension, type2_diabetes). Logs history if authenticated.
+      summary: Recommend Meals by Condition
+      tags:
+      - Recommendations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendByConditionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecommendByConditionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecommendByConditionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+          description: ''
+  /api/recommend/symptoms/:
+    post:
+      operationId: recommend_symptoms_create
+      description: Backward-chain Prolog rules to diagnose nutrient deficiencies from
+        symptoms and return meal recommendations.
+      summary: Recommend Meals by Symptoms
+      tags:
+      - Recommendations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendBySymptomsRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecommendBySymptomsRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecommendBySymptomsRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+          description: ''
+components:
+  schemas:
+    ActivityLevelEnum:
+      enum:
+      - sedentary
+      - light
+      - moderate
+      - active
+      - very_active
+      type: string
+      description: |-
+        * `sedentary` - Sedentary
+        * `light` - Lightly Active
+        * `moderate` - Moderately Active
+        * `active` - Active
+        * `very_active` - Very Active
+    ConditionEnum:
+      enum:
+      - healthy
+      - hypertension
+      - type2_diabetes
+      - anaemia
+      - vitA_deficiency
+      - rickets
+      - unknown
+      type: string
+      description: |-
+        * `healthy` - healthy
+        * `hypertension` - hypertension
+        * `type2_diabetes` - type2_diabetes
+        * `anaemia` - anaemia
+        * `vitA_deficiency` - vitA_deficiency
+        * `rickets` - rickets
+        * `unknown` - unknown
+    FoodItemList:
+      type: object
+      properties:
+        name:
+          type: string
+        food_group:
+          type: string
+        calories_per_100g:
+          type: number
+          format: double
+        protein_g:
+          type: number
+          format: double
+        carbs_g:
+          type: number
+          format: double
+        fat_g:
+          type: number
+          format: double
+        fibre_g:
+          type: number
+          format: double
+      required:
+      - calories_per_100g
+      - carbs_g
+      - fat_g
+      - fibre_g
+      - food_group
+      - name
+      - protein_g
+    HealthCondition:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        condition:
+          type: string
+          maxLength: 100
+        diagnosed_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - condition
+      - diagnosed_at
+      - id
+    HealthConditionRequest:
+      type: object
+      properties:
+        condition:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+      - condition
+    HealthStatusDegraded:
+      type: object
+      properties:
+        status:
+          type: string
+        database:
+          type: string
+        prolog:
+          type: string
+      required:
+      - database
+      - prolog
+      - status
+    HealthStatusOk:
+      type: object
+      properties:
+        status:
+          type: string
+        database:
+          type: string
+        prolog:
+          type: string
+      required:
+      - database
+      - prolog
+      - status
+    MealRecommendationList:
+      type: object
+      properties:
+        staple:
+          type: string
+        protein:
+          type: string
+        vegetable:
+          type: string
+        explanation:
+          type: string
+      required:
+      - explanation
+      - protein
+      - staple
+      - vegetable
+    MicronutrientProfile:
+      type: object
+      properties:
+        food:
+          type: string
+        iron_mg:
+          type: number
+          format: double
+        calcium_mg:
+          type: number
+          format: double
+        zinc_mg:
+          type: number
+          format: double
+        vitA_ug:
+          type: number
+          format: double
+        vitC_mg:
+          type: number
+          format: double
+        folate_ug:
+          type: number
+          format: double
+      required:
+      - calcium_mg
+      - folate_ug
+      - food
+      - iron_mg
+      - vitA_ug
+      - vitC_mg
+      - zinc_mg
+    NutriLogicTokenObtainPairRequest:
+      type: object
+      description: JWT pair that embeds ``username`` so the SPA can display identity.
+      properties:
+        username:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - username
+    PatchedUserProfileRequest:
+      type: object
+      properties:
+        age:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        weight_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        height_cm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevelEnum'
+        county:
+          type: string
+          maxLength: 100
+    RecommendByConditionRequest:
+      type: object
+      description: Payload for /api/recommend/condition/ endpoint.
+      properties:
+        condition:
+          $ref: '#/components/schemas/ConditionEnum'
+      required:
+      - condition
+    RecommendBySymptomsRequest:
+      type: object
+      description: Payload for /api/recommend/symptoms/ endpoint.
+      properties:
+        symptoms:
+          type: array
+          items:
+            $ref: '#/components/schemas/SymptomsEnum'
+          minItems: 1
+      required:
+      - symptoms
+    RecommendationLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        symptoms: {}
+        condition:
+          type: string
+          maxLength: 100
+        recommendations: {}
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+    RecommendationResponse:
+      type: object
+      properties:
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/MealRecommendationList'
+        condition:
+          type: string
+        symptoms:
+          type: array
+          items:
+            type: string
+        deficiency:
+          type: string
+      required:
+      - recommendations
+    RegisterSuccessResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    SymptomsEnum:
+      enum:
+      - fatigue
+      - pale_skin
+      - night_blindness
+      - dry_skin
+      - frequent_infections
+      - bone_pain
+      - muscle_weakness
+      - rickets
+      - mouth_sores
+      - muscle_cramps
+      type: string
+      description: |-
+        * `fatigue` - fatigue
+        * `pale_skin` - pale_skin
+        * `night_blindness` - night_blindness
+        * `dry_skin` - dry_skin
+        * `frequent_infections` - frequent_infections
+        * `bone_pain` - bone_pain
+        * `muscle_weakness` - muscle_weakness
+        * `rickets` - rickets
+        * `mouth_sores` - mouth_sores
+        * `muscle_cramps` - muscle_cramps
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          title: Email address
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+      required:
+      - id
+      - username
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          readOnly: true
+        age:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+          nullable: true
+        weight_kg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        height_cm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          nullable: true
+        activity_level:
+          $ref: '#/components/schemas/ActivityLevelEnum'
+        county:
+          type: string
+          maxLength: 100
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/HealthCondition'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - conditions
+      - created_at
+      - id
+      - updated_at
+      - user
+    UserRegistrationRequest:
+      type: object
+      description: Payload for POST /api/auth/register/.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          minLength: 1
+          default: ''
+        password:
+          type: string
+          writeOnly: true
+          minLength: 8
+        password2:
+          type: string
+          writeOnly: true
+          minLength: 8
+      required:
+      - password
+      - password2
+      - username
+    UserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          title: Email address
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+      required:
+      - username
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

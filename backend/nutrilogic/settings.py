@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "drf_spectacular",
     # Local
     "nutrition",
 ]
@@ -162,6 +163,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
@@ -179,6 +181,14 @@ REST_FRAMEWORK = {
         "auth": "20/min",
         "recommend": "60/min",
     },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "NutriLogic Expert System API",
+    "DESCRIPTION": "REST API gateway for SWI-Prolog symbolic nutrition expert system (MOH 2025 Kenya Nutrient Profile Model)",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 SIMPLE_JWT = {
