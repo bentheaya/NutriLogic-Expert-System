@@ -8,38 +8,35 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { refreshToken as apiRefreshToken } from "../api/nutrilogicApi";
 
 const TOKEN_KEY = "nutrilogic_refresh";
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 const AuthContext = createContext(null);
 
-// ---------------------------------------------------------------------------
-// Module-level helpers (no component state dependency)
-// ---------------------------------------------------------------------------
-
 function decodePayload(token) {
   try {
-    return JSON.parse(atob(token.split(".")[1]));
+    const payloadB64 = token.split(".")[1];
+    const padded = payloadB64 + "=".repeat((4 - (payloadB64.length % 4)) % 4);
+    return JSON.parse(atob(padded.replace(/-/g, "+").replace(/_/g, "/")));
   } catch {
     return null;
   }
 }
 
-async function refreshAccessToken(refreshToken) {
-  const resp = await fetch(`${BASE_URL}/auth/token/refresh/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh: refreshToken }),
-  });
-  if (!resp.ok) return null;
-  const data = await resp.json();
-  return data.access || null;
+function userFromAccessToken(access) {
+  const payload = decodePayload(access);
+  if (!payload) return null;
+  // Backend embeds username via NutriLogicTokenObtainPairSerializer.
+  if (payload.username) {
+    return { username: payload.username, userId: payload.user_id };
+  }
+  return { username: null, userId: payload.user_id };
 }
 
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(null);
-  const [user, setUser] = useState(null); // { username, ... } decoded from token
+  const [user, setUser] = useState(null);
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
@@ -47,32 +44,33 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  // ---------------------------------------------------------------------------
-  // On mount: restore session from stored refresh token
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     const stored = localStorage.getItem(TOKEN_KEY);
     if (!stored) return;
 
-    refreshAccessToken(stored).then((access) => {
-      if (access) {
+    apiRefreshToken(stored)
+      .then((data) => {
+        const access = data?.access;
+        if (!access) {
+          localStorage.removeItem(TOKEN_KEY);
+          return;
+        }
+        // SimpleJWT with ROTATE_REFRESH_TOKENS returns a new refresh token.
+        if (data.refresh) {
+          localStorage.setItem(TOKEN_KEY, data.refresh);
+        }
         setAccessToken(access);
-        const payload = decodePayload(access);
-        if (payload) setUser({ username: payload.username });
-      } else {
+        setUser(userFromAccessToken(access));
+      })
+      .catch(() => {
         localStorage.removeItem(TOKEN_KEY);
-      }
-    });
-  }, []); // refreshAccessToken is module-level; no closure over state
+      });
+  }, []);
 
-  // ---------------------------------------------------------------------------
-  // login — called after obtaining token pair from the backend
-  // ---------------------------------------------------------------------------
   function login(accessTok, refreshTok) {
     localStorage.setItem(TOKEN_KEY, refreshTok);
     setAccessToken(accessTok);
-    const payload = decodePayload(accessTok);
-    if (payload) setUser({ username: payload.username });
+    setUser(userFromAccessToken(accessTok));
   }
 
   return (
@@ -82,6 +80,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(AuthContext);
 }

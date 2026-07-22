@@ -1,6 +1,10 @@
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from .domain import CONDITIONS, SYMPTOMS
 from .models import HealthCondition, RecommendationLog, UserProfile
 
 
@@ -62,6 +66,16 @@ class UserRegistrationSerializer(serializers.Serializer):
     def validate(self, data):
         if data["password"] != data["password2"]:
             raise serializers.ValidationError({"password2": "Passwords do not match."})
+        try:
+            validate_password(
+                data["password"],
+                user=User(
+                    username=data.get("username", ""),
+                    email=data.get("email", ""),
+                ),
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"password": list(exc.messages)}) from exc
         return data
 
     def create(self, validated_data):
@@ -73,6 +87,16 @@ class UserRegistrationSerializer(serializers.Serializer):
         )
 
 
+class NutriLogicTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """JWT pair that embeds ``username`` so the SPA can display identity."""
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["username"] = user.username
+        return token
+
+
 # ---------------------------------------------------------------------------
 # Request / Response payloads (not tied to DB models)
 # ---------------------------------------------------------------------------
@@ -80,36 +104,13 @@ class UserRegistrationSerializer(serializers.Serializer):
 class RecommendByConditionSerializer(serializers.Serializer):
     """Payload for /api/recommend/condition/ endpoint."""
 
-    CONDITION_CHOICES = [
-        "healthy",
-        "hypertension",
-        "type2_diabetes",
-        "anaemia",
-        "vitA_deficiency",
-        "rickets",
-        "unknown",
-    ]
-
-    condition = serializers.ChoiceField(choices=CONDITION_CHOICES)
+    condition = serializers.ChoiceField(choices=CONDITIONS)
 
 
 class RecommendBySymptomsSerializer(serializers.Serializer):
     """Payload for /api/recommend/symptoms/ endpoint."""
 
-    VALID_SYMPTOMS = [
-        "fatigue",
-        "pale_skin",
-        "night_blindness",
-        "dry_skin",
-        "frequent_infections",
-        "bone_pain",
-        "muscle_weakness",
-        "rickets",
-        "mouth_sores",
-        "muscle_cramps",
-    ]
-
     symptoms = serializers.ListField(
-        child=serializers.ChoiceField(choices=VALID_SYMPTOMS),
+        child=serializers.ChoiceField(choices=SYMPTOMS),
         min_length=1,
     )

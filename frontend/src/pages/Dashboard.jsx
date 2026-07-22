@@ -79,5 +79,4 @@ export default function Dashboard({ onNavigate }) {
       </div>
     </div>
   );
-  // testing
 }

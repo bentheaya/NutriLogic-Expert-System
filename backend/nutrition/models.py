@@ -56,5 +56,14 @@ class RecommendationLog(models.Model):
     recommendations = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["profile", "-created_at"],
+                name="nutri_reclog_prof_created",
+            ),
+        ]
+        ordering = ["-created_at"]
+
     def __str__(self):
         return f"Recommendation({self.pk}) – {self.condition or 'symptom-based'}"

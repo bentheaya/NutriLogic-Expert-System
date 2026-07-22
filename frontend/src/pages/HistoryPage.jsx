@@ -2,13 +2,12 @@
  * HistoryPage.jsx
  * ---------------
  * Displays the authenticated user's last 20 recommendation logs.
- * Each log shows the condition or symptoms queried, and the Prolog-generated
- * meal recommendations at the time of the request.
  */
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getRecommendationHistory } from "../api/nutrilogicApi";
+import MealCard from "../components/MealCard";
 
 export default function HistoryPage() {
   const { accessToken } = useAuth();
@@ -31,10 +30,14 @@ export default function HistoryPage() {
     <div className="page">
       <div className="card">
         <h2>Recommendation History</h2>
-        <p className="subtitle">Your last {logs.length} recommendation{logs.length !== 1 ? "s" : ""}.</p>
+        <p className="subtitle">
+          Your last {logs.length} recommendation{logs.length !== 1 ? "s" : ""}.
+        </p>
 
         {logs.length === 0 ? (
-          <p>No recommendations saved yet. Use the Recommendations page and they will appear here.</p>
+          <p>
+            No recommendations saved yet. Use the Recommendations page and they will appear here.
+          </p>
         ) : (
           <ul className="history-list">
             {logs.map((log) => (
@@ -59,14 +62,7 @@ export default function HistoryPage() {
                 {log.recommendations.length > 0 ? (
                   <ul className="meal-list">
                     {log.recommendations.map((rec, i) => (
-                      <li key={i} className="meal-card">
-                        <div className="meal-items">
-                          <span className="meal-tag staple">🌽 {rec.staple?.replace(/_/g, " ")}</span>
-                          <span className="meal-tag protein">🥩 {rec.protein?.replace(/_/g, " ")}</span>
-                          <span className="meal-tag vegetable">🥬 {rec.vegetable?.replace(/_/g, " ")}</span>
-                        </div>
-                        <p className="explanation">{rec.explanation}</p>
-                      </li>
+                      <MealCard key={i} recommendation={rec} />
                     ))}
                   </ul>
                 ) : (

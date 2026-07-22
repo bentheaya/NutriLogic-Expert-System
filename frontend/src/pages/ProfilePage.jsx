@@ -8,14 +8,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getProfile, updateProfile } from "../api/nutrilogicApi";
-
-const ACTIVITY_OPTIONS = [
-  { value: "sedentary", label: "Sedentary" },
-  { value: "light", label: "Lightly Active" },
-  { value: "moderate", label: "Moderately Active" },
-  { value: "active", label: "Active" },
-  { value: "very_active", label: "Very Active" },
-];
+import { ACTIVITY_OPTIONS } from "../constants/domain";
 
 export default function ProfilePage() {
   const { accessToken, user } = useAuth();

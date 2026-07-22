@@ -32,7 +32,7 @@ async function apiFetch(endpoint, options = {}, token = null) {
     try {
       const data = await response.json();
       message = data.detail || JSON.stringify(data);
-    } catch (_) {
+    } catch {
       // ignore parse error; use status message
     }
     throw new Error(message);
@@ -132,14 +132,23 @@ export function obtainToken(username, password) {
 
 /**
  * Refresh the access token using the stored refresh token.
+ * With ROTATE_REFRESH_TOKENS the response may also include a new ``refresh``.
  * @param {string} refresh
- * @returns {Promise<{access: string}>}
+ * @returns {Promise<{access: string, refresh?: string}>}
  */
 export function refreshToken(refresh) {
   return apiFetch("/auth/token/refresh/", {
     method: "POST",
     body: JSON.stringify({ refresh }),
   });
+}
+
+/**
+ * Liveness / readiness probe.
+ * @returns {Promise<{status: string, database: string, prolog: string}>}
+ */
+export function getHealth() {
+  return apiFetch("/health/");
 }
 
 // ---------------------------------------------------------------------------

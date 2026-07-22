@@ -48,7 +48,7 @@ export default function Navbar({ activePage, onNavigate }) {
         {user ? (
           <li>
             <button className="nav-link nav-link-auth" onClick={handleLogout}>
-              Sign Out ({user.username})
+              Sign Out{user.username ? ` (${user.username})` : ""}
             </button>
           </li>
         ) : (

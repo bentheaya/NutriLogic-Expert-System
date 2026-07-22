@@ -9,28 +9,8 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { recommendByCondition, recommendBySymptoms } from "../api/nutrilogicApi";
-
-const CONDITIONS = [
-  { value: "healthy", label: "Healthy (general)" },
-  { value: "hypertension", label: "Hypertension" },
-  { value: "type2_diabetes", label: "Type 2 Diabetes" },
-  { value: "anaemia", label: "Anaemia" },
-  { value: "vitA_deficiency", label: "Vitamin A Deficiency" },
-  { value: "rickets", label: "Rickets / Vitamin D Deficiency" },
-];
-
-const SYMPTOMS = [
-  { value: "fatigue", label: "Fatigue / tiredness" },
-  { value: "pale_skin", label: "Pale skin" },
-  { value: "night_blindness", label: "Night blindness" },
-  { value: "dry_skin", label: "Dry skin" },
-  { value: "frequent_infections", label: "Frequent infections" },
-  { value: "bone_pain", label: "Bone pain" },
-  { value: "muscle_weakness", label: "Muscle weakness" },
-  { value: "rickets", label: "Rickets (bowing of legs)" },
-  { value: "mouth_sores", label: "Mouth sores" },
-  { value: "muscle_cramps", label: "Muscle cramps" },
-];
+import { CONDITIONS, SYMPTOMS } from "../constants/domain";
+import MealCard from "./MealCard";
 
 export default function RecommendationForm() {
   const { accessToken } = useAuth();
@@ -79,7 +59,6 @@ export default function RecommendationForm() {
         <p className="subtitle">✅ Logged in — your recommendations will be saved to history.</p>
       )}
 
-      {/* Mode toggle */}
       <div className="mode-toggle">
         <button
           className={mode === "condition" ? "active" : ""}
@@ -144,20 +123,7 @@ export default function RecommendationForm() {
           ) : (
             <ul className="meal-list">
               {results.recommendations.map((rec, i) => (
-                <li key={i} className="meal-card">
-                  <div className="meal-items">
-                    <span className="meal-tag staple">
-                      🌽 {rec.staple.replace(/_/g, " ")}
-                    </span>
-                    <span className="meal-tag protein">
-                      🥩 {rec.protein.replace(/_/g, " ")}
-                    </span>
-                    <span className="meal-tag vegetable">
-                      🥬 {rec.vegetable.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                  <p className="explanation">{rec.explanation}</p>
-                </li>
+                <MealCard key={i} recommendation={rec} />
               ))}
             </ul>
           )}
