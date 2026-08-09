@@ -17376,3 +17376,6536 @@ The resulting architecture realizes the Presentation View of NutriLogic and prov
 
 ---
 
+# Chapter 23: Deployment and Operations Architecture
+
+## 23.1 Introduction
+
+Chapters 19–22 transformed the conceptual NutriLogic architecture into an application-oriented software structure. Chapter 19 established the Domain-Driven Application Architecture; Chapter 20 defined persistence; Chapter 21 established the REST API boundary; and Chapter 22 defined the React presentation architecture.
+
+Chapter 23 addresses the next architectural concern: **how the complete NutriLogic platform is deployed, operated, monitored, secured, and maintained as an executable system**.
+
+The Deployment and Operations Architecture realizes the Infrastructure View of NutriLogic.
+
+The purpose of this chapter is not merely to specify servers or containers. It defines the operational environment within which the React frontend, Django application, PostgreSQL persistence layer, semantic knowledge infrastructure, SWI-Prolog reasoning engine, logging facilities, and supporting services cooperate.
+
+The deployment architecture must preserve the architectural principles established throughout the dissertation:
+
+* clinical reasoning remains within the symbolic reasoning layer;
+* application orchestration remains within Django;
+* persistence remains behind repository abstractions;
+* the frontend communicates through the REST API;
+* knowledge remains governed and versioned;
+* security and privacy controls apply across the deployment boundary;
+* operational failures must not be represented as successful clinical recommendations.
+
+The existing system architecture identifies PostgreSQL, optional Redis, SWI-Prolog, file storage, logging, and Docker as infrastructure components.
+
+---
+
+# 23.2 Objectives
+
+The Deployment and Operations Architecture aims to:
+
+1. Define the production topology of NutriLogic.
+2. Establish clear runtime boundaries between frontend, backend, persistence, and reasoning infrastructure.
+3. Define development, testing, staging, and production environments.
+4. Establish secure configuration and secrets management.
+5. Define deployment of the React application.
+6. Define deployment of the Django application.
+7. Define deployment and lifecycle management of PostgreSQL.
+8. Define operational integration with SWI-Prolog.
+9. Define process, worker, and concurrency constraints.
+10. Establish HTTPS and network-security requirements.
+11. Define health checks and readiness mechanisms.
+12. Establish logging and monitoring.
+13. Define backup and recovery procedures.
+14. Define CI/CD principles.
+15. Establish deployment rollback procedures.
+16. Support controlled knowledge-base updates.
+17. Provide a foundation for scalability without prematurely introducing unnecessary distributed-system complexity.
+
+---
+
+# 23.3 Architectural Context
+
+NutriLogic is deployed as a multi-component system.
+
+```text
+                         Internet / Users
+                                │
+                                ▼
+                    ┌─────────────────────┐
+                    │ Reverse Proxy / TLS │
+                    └──────────┬──────────┘
+                               │
+                 ┌─────────────┴─────────────┐
+                 ▼                           ▼
+        ┌────────────────┐          ┌─────────────────┐
+        │ React Frontend │          │ Django REST API │
+        │      SPA       │          │ Application     │
+        └────────────────┘          └────────┬────────┘
+                                             │
+                    ┌────────────────────────┼────────────────────┐
+                    │                        │                    │
+                    ▼                        ▼                    ▼
+             ┌─────────────┐        ┌────────────────┐    ┌──────────────┐
+             │ PostgreSQL  │        │ SWI-Prolog     │    │ File /       │
+             │             │        │ Reasoning      │    │ Knowledge    │
+             └─────────────┘        └────────────────┘    │ Storage      │
+                                                          └──────────────┘
+                                             │
+                                             ▼
+                                      ┌──────────────┐
+                                      │ Logging /    │
+                                      │ Monitoring   │
+                                      └──────────────┘
+```
+
+This deployment structure reflects the broader platform architecture in which React communicates with Django through HTTPS/REST/JWT, while Django coordinates PostgreSQL and the symbolic reasoning infrastructure.
+
+---
+
+# 23.4 Deployment Principles
+
+## 23.4.1 Separation of Runtime Responsibilities
+
+Each major subsystem should have one clearly defined operational responsibility.
+
+| Component         | Operational Responsibility         |
+| ----------------- | ---------------------------------- |
+| React             | Presentation                       |
+| Reverse Proxy     | TLS termination and HTTP routing   |
+| Django            | Application orchestration and API  |
+| PostgreSQL        | Persistent relational data         |
+| SWI-Prolog        | Symbolic inference                 |
+| Knowledge Storage | Governed knowledge artefacts       |
+| Logging           | Operational and audit events       |
+| Monitoring        | Health and performance observation |
+| Redis             | Optional caching/task coordination |
+
+This prevents the deployment environment from collapsing multiple responsibilities into a single opaque process.
+
+---
+
+## 23.4.2 Infrastructure Is Not Domain Logic
+
+Infrastructure configuration must never become a substitute for domain architecture.
+
+For example:
+
+```text
+Docker
+Nginx
+PostgreSQL
+Redis
+```
+
+are implementation mechanisms.
+
+They do not define:
+
+```text
+NutritionAssessment
+Recommendation
+ExplanationSession
+KnowledgeModule
+```
+
+Those concepts remain part of the domain architecture established in Chapters 19 and 20.
+
+---
+
+## 23.4.3 Production Must Differ from Development
+
+The development environment prioritizes convenience.
+
+The production environment prioritizes:
+
+* security;
+* availability;
+* observability;
+* reproducibility;
+* data integrity;
+* controlled deployment;
+* recoverability.
+
+Therefore, development settings must never simply be promoted unchanged into production.
+
+---
+
+# 23.5 Environment Architecture
+
+NutriLogic should distinguish at least four environments.
+
+```text
+Development
+     │
+     ▼
+Testing / CI
+     │
+     ▼
+Staging
+     │
+     ▼
+Production
+```
+
+## Development
+
+Purpose:
+
+* local development;
+* rapid experimentation;
+* debugging;
+* knowledge-engineering development.
+
+Typical characteristics:
+
+* local PostgreSQL or development database;
+* local SWI-Prolog;
+* development React server;
+* Django development server;
+* verbose diagnostics.
+
+---
+
+## Testing / CI
+
+Purpose:
+
+* automated tests;
+* regression testing;
+* API validation;
+* domain tests;
+* frontend tests;
+* knowledge-base tests.
+
+The architecture should permit Prolog integration tests to be isolated or replaced by controlled test doubles when the reasoning engine is unavailable.
+
+---
+
+## Staging
+
+Purpose:
+
+* production-like integration testing;
+* deployment verification;
+* migration testing;
+* end-to-end testing;
+* performance checks.
+
+Staging should approximate production architecture sufficiently to reveal deployment-specific defects before release.
+
+---
+
+## Production
+
+Purpose:
+
+* actual system operation.
+
+Production requires:
+
+* HTTPS;
+* strong secrets;
+* PostgreSQL;
+* controlled Prolog runtime;
+* restricted network access;
+* monitoring;
+* backups;
+* audit logging;
+* controlled knowledge deployment.
+
+---
+
+# 23.6 Containerization Strategy
+
+Docker may be used to provide reproducible runtime environments.
+
+A conceptual deployment is:
+
+```text
+Docker Network
+│
+├── frontend
+│
+├── reverse-proxy
+│
+├── django
+│
+├── prolog
+│
+├── postgres
+│
+└── redis (optional)
+```
+
+However, containerization should not be treated as an architectural requirement by itself.
+
+The architectural requirement is **runtime isolation and reproducibility**.
+
+Docker is one implementation mechanism for achieving this requirement.
+
+---
+
+# 23.7 Container Responsibilities
+
+## Frontend Container
+
+Responsible for:
+
+* serving the compiled React application;
+* providing static assets;
+* exposing no database or Prolog access.
+
+---
+
+## Backend Container
+
+Responsible for:
+
+* Django;
+* Django REST Framework;
+* application services;
+* domain orchestration;
+* authentication;
+* API endpoints.
+
+---
+
+## Prolog Runtime
+
+Responsible for:
+
+* SWI-Prolog;
+* governed knowledge modules;
+* symbolic inference.
+
+The Django application communicates with this runtime through the established inference adapter.
+
+---
+
+## PostgreSQL Container / Service
+
+Responsible for:
+
+* persistent relational data;
+* transaction management;
+* recommendation history;
+* assessments;
+* profiles;
+* explanations;
+* audit-related persistence.
+
+---
+
+# 23.8 SWI-Prolog Runtime Architecture
+
+The SWI-Prolog engine requires special treatment because it is not simply another stateless HTTP service.
+
+The existing backend architecture explicitly treats PySWIP as the infrastructure adapter between the application and the Prolog engine. Chapter 19 also defines the Prolog adapter as an infrastructure implementation of the inference port.
+
+The operational relationship is therefore:
+
+```text
+Django Application
+       │
+       ▼
+IInferenceEngine
+       │
+       ▼
+Prolog Adapter
+       │
+       ▼
+PySWIP
+       │
+       ▼
+SWI-Prolog
+       │
+       ▼
+Knowledge Modules
+```
+
+---
+
+# 23.9 Prolog Process and Concurrency Constraints
+
+The Prolog engine must be deployed according to the concurrency characteristics of the implementation.
+
+A critical rule is:
+
+> A production deployment must not assume that an arbitrary number of Django workers can safely share a single Prolog engine instance.
+
+Where the selected PySWIP integration maintains a process-local engine, each worker/process must be treated as having its own Prolog runtime or must access a deliberately managed inference service.
+
+Therefore:
+
+```text
+Django Worker A ───► Prolog Runtime A
+
+Django Worker B ───► Prolog Runtime B
+```
+
+may be safer than:
+
+```text
+Django Worker A ──┐
+Django Worker B ──┼──► One uncontrolled Prolog engine
+Django Worker C ──┘
+```
+
+The exact deployment strategy must be validated against the actual PySWIP and SWI-Prolog integration used by the implementation.
+
+This is an important operational constraint and must not be hidden behind generic claims of horizontal scalability.
+
+---
+
+# 23.10 Database Deployment
+
+PostgreSQL is the preferred production persistence technology.
+
+The deployment should separate:
+
+```text
+Application
+     │
+     ▼
+Database Connection Pool
+     │
+     ▼
+PostgreSQL
+```
+
+The application should not embed database credentials in source code.
+
+Database configuration should be supplied through secure environment configuration or an equivalent secrets mechanism.
+
+---
+
+# 23.11 Database Migration Strategy
+
+Database schema changes shall be managed through version-controlled migrations.
+
+The deployment process is:
+
+```text
+Code Change
+    │
+    ▼
+Migration Generated
+    │
+    ▼
+Migration Tested
+    │
+    ▼
+Staging Deployment
+    │
+    ▼
+Production Migration
+    │
+    ▼
+Application Deployment
+```
+
+Migrations must be tested before production deployment.
+
+Destructive schema changes should be handled cautiously, particularly when historical nutrition assessments, recommendations, explanations, or audit records depend on the affected data.
+
+---
+
+# 23.12 Knowledge-Base Deployment
+
+Knowledge artefacts require a deployment process distinct from ordinary application code.
+
+The conceptual lifecycle is:
+
+```text
+Knowledge Change
+      │
+      ▼
+Authoring
+      │
+      ▼
+Validation
+      │
+      ▼
+Clinical Review
+      │
+      ▼
+Versioning
+      │
+      ▼
+Testing
+      │
+      ▼
+Staging
+      │
+      ▼
+Approval
+      │
+      ▼
+Production Activation
+```
+
+This is consistent with the governance architecture, which requires knowledge modifications to undergo controlled validation and versioning before deployment.
+
+Knowledge deployment must therefore not be equivalent to editing a `.pl` file directly on a production server.
+
+---
+
+# 23.13 Configuration Management
+
+Configuration should be divided into:
+
+### Application Configuration
+
+Examples:
+
+```text
+DJANGO_DEBUG
+DJANGO_ALLOWED_HOSTS
+DJANGO_CORS_ORIGINS
+DATABASE_URL
+```
+
+### Infrastructure Configuration
+
+Examples:
+
+```text
+database host
+database port
+Prolog runtime location
+Redis endpoint
+storage paths
+```
+
+### Secrets
+
+Examples:
+
+```text
+DJANGO_SECRET_KEY
+JWT signing secrets
+database passwords
+external service credentials
+```
+
+Secrets must never be committed to source control.
+
+---
+
+# 23.14 Secret Management
+
+The following principle applies:
+
+```text
+Source Code
+     ✗
+     │
+     └── No secrets
+
+Environment / Secret Store
+     │
+     ▼
+Application Runtime
+```
+
+Production secrets should be injected at deployment time.
+
+The system should also support secret rotation without requiring source-code changes.
+
+---
+
+# 23.15 Network Architecture
+
+A production topology should restrict direct exposure.
+
+```text
+                    Internet
+                       │
+                       ▼
+                Reverse Proxy
+                       │
+                HTTPS / TLS
+                       │
+                       ▼
+                Django API
+                  │       │
+                  │       └────► Prolog
+                  │
+                  └────────────► PostgreSQL
+```
+
+PostgreSQL and Prolog infrastructure should not be directly exposed to the public Internet.
+
+Only the required public endpoints should be externally accessible.
+
+---
+
+# 23.16 HTTPS and Transport Security
+
+Production communication shall use HTTPS.
+
+The primary flow is:
+
+```text
+Browser
+   │
+ HTTPS
+   ▼
+Reverse Proxy
+   │
+Secure Internal Network
+   ▼
+Django
+```
+
+TLS configuration should include:
+
+* valid certificates;
+* secure protocol versions;
+* secure cipher configuration;
+* HTTP-to-HTTPS redirection;
+* secure cookies where applicable;
+* appropriate security headers.
+
+---
+
+# 23.17 Reverse Proxy
+
+A reverse proxy provides the public network boundary.
+
+Responsibilities may include:
+
+* TLS termination;
+* HTTP routing;
+* serving frontend static assets;
+* forwarding API requests;
+* request size limits;
+* compression where appropriate;
+* security headers;
+* access logging.
+
+The reverse proxy should not contain clinical business logic.
+
+---
+
+# 23.18 Static Asset Deployment
+
+The React application should be built before production deployment.
+
+Conceptually:
+
+```text
+React Source
+     │
+     ▼
+npm build
+     │
+     ▼
+Static Assets
+     │
+     ▼
+Web Server / CDN / Reverse Proxy
+```
+
+Development tooling such as the Vite development server should not be exposed as the production application server.
+
+---
+
+# 23.19 Django Application Deployment
+
+The production Django application should run using an appropriate production application server rather than the Django development server.
+
+Conceptually:
+
+```text
+Reverse Proxy
+      │
+      ▼
+Application Server
+      │
+      ▼
+Django
+```
+
+The exact server configuration must be selected according to the application's synchronous/asynchronous requirements and the operational behaviour of the Prolog integration.
+
+---
+
+# 23.20 ASGI and WSGI Considerations
+
+The deployment architecture must distinguish between:
+
+* synchronous Django execution;
+* asynchronous ASGI execution;
+* background workers;
+* Prolog inference execution.
+
+The presence of Django Channels or other asynchronous infrastructure does not automatically mean that every part of the application should become asynchronous.
+
+In particular, the Prolog adapter must be tested under the selected execution model.
+
+The deployment configuration should therefore be based on measured and validated behaviour rather than assuming that ASGI alone solves inference concurrency.
+
+---
+
+# 23.21 Optional Redis Infrastructure
+
+Redis may be introduced where justified for:
+
+* caching;
+* background-job coordination;
+* rate limiting;
+* ephemeral state;
+* asynchronous task infrastructure.
+
+However:
+
+> Redis should not become a source of truth for clinical records.
+
+Persistent clinical information remains in PostgreSQL.
+
+The existing architecture identifies Redis as optional infrastructure, which means its inclusion should be justified by an actual operational requirement rather than architectural fashion.
+
+---
+
+# 23.22 Background Processing
+
+Long-running workloads may eventually require asynchronous execution.
+
+Potential candidates include:
+
+* large-scale analytics;
+* report generation;
+* scheduled monitoring;
+* notifications;
+* batch knowledge validation;
+* population-level inference.
+
+The conceptual architecture becomes:
+
+```text
+Django
+   │
+   ▼
+Task Queue
+   │
+   ▼
+Worker
+   │
+   ├── Analytics
+   ├── Reports
+   └── Notifications
+```
+
+However, background execution should not be introduced merely to make the architecture appear sophisticated.
+
+The simplest reliable deployment should be preferred until workload measurements justify additional infrastructure.
+
+---
+
+# 23.23 Health Checks
+
+Operational health should distinguish between:
+
+### Liveness
+
+Is the process running?
+
+### Readiness
+
+Can the application actually serve requests?
+
+### Dependency Readiness
+
+Are critical dependencies available?
+
+Conceptually:
+
+```text
+/api/health/
+     │
+     ├── Application
+     ├── Database
+     └── Inference readiness
+```
+
+A process that is running but cannot access PostgreSQL or execute required inference should not necessarily be considered fully ready.
+
+---
+
+# 23.24 Inference Readiness
+
+Because symbolic reasoning is central to NutriLogic, inference readiness deserves explicit treatment.
+
+A readiness check may verify:
+
+```text
+Django
+  │
+  ▼
+Prolog Adapter
+  │
+  ▼
+SWI-Prolog
+  │
+  ▼
+Minimal Knowledge Query
+```
+
+The check should be lightweight and must not execute an expensive clinical workflow.
+
+---
+
+# 23.25 Logging Architecture
+
+Logging should operate at several levels.
+
+```text
+Application Logs
+      │
+      ├── Authentication
+      ├── API
+      ├── Application Services
+      ├── Inference
+      ├── Database
+      └── Errors
+```
+
+The system should distinguish:
+
+* informational events;
+* warnings;
+* errors;
+* security events;
+* audit events.
+
+---
+
+# 23.26 Clinical Data and Logging
+
+Because NutriLogic processes sensitive health information, logging must minimize unnecessary clinical content.
+
+Bad practice:
+
+```text
+Patient: John Doe
+BMI: 31.4
+Blood Pressure: 165/102
+Diagnosis: ...
+```
+
+in an unrestricted application log.
+
+Prefer:
+
+```text
+assessment_id=...
+request_id=...
+event=inference_completed
+duration_ms=...
+```
+
+with sensitive details retained only in controlled clinical storage where required.
+
+---
+
+# 23.27 Audit Logging
+
+Audit logging should capture security- and governance-relevant actions.
+
+Examples include:
+
+* login events;
+* profile changes;
+* assessment submission;
+* recommendation generation;
+* explanation retrieval;
+* knowledge-module modification;
+* knowledge activation;
+* administrative actions.
+
+Audit records should be distinguishable from ordinary debugging logs.
+
+---
+
+# 23.28 Monitoring Architecture
+
+Operational monitoring should observe:
+
+```text
+                    Monitoring
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+     Frontend         Django          Infrastructure
+        │               │                │
+     Errors          API errors       CPU / memory
+     latency         latency          storage
+     availability    inference        database
+```
+
+Important indicators include:
+
+* API latency;
+* inference latency;
+* inference failure rate;
+* database availability;
+* application errors;
+* authentication failures;
+* resource utilization;
+* frontend failures.
+
+---
+
+# 23.29 Inference-Specific Metrics
+
+The neuro-symbolic nature of NutriLogic requires inference-specific operational metrics.
+
+Examples include:
+
+```text
+inference_requests_total
+inference_success_total
+inference_failure_total
+inference_duration
+rule_evaluation_duration
+knowledge_module_version
+explanation_generation_duration
+```
+
+These metrics help distinguish application failures from reasoning failures.
+
+---
+
+# 23.30 Performance Monitoring
+
+Performance should be measured across the complete request path.
+
+```text
+Browser
+   │
+   ▼
+Network
+   │
+   ▼
+Django
+   │
+   ▼
+Application Service
+   │
+   ▼
+Prolog
+   │
+   ▼
+Persistence
+```
+
+A slow recommendation request should therefore be decomposable into:
+
+```text
+API latency
++
+application processing
++
+inference latency
++
+database latency
++
+serialization
+```
+
+This is more useful than measuring only total response time.
+
+---
+
+# 23.31 Backup Architecture
+
+PostgreSQL must be backed up regularly.
+
+The backup strategy should include:
+
+* scheduled backups;
+* retention policies;
+* backup integrity verification;
+* off-system storage;
+* recovery testing.
+
+A backup that has never been restored is not sufficient evidence of recoverability.
+
+---
+
+# 23.32 Knowledge Backup
+
+Knowledge artefacts require independent versioned backup.
+
+This includes:
+
+* ontology definitions;
+* knowledge graph data;
+* Prolog rules;
+* rule-module metadata;
+* knowledge versions;
+* governance metadata.
+
+The goal is to ensure that a historical recommendation can be associated with the knowledge version that produced it.
+
+---
+
+# 23.33 Disaster Recovery
+
+A disaster-recovery strategy should define:
+
+```text
+Failure
+  │
+  ▼
+Detection
+  │
+  ▼
+Isolation
+  │
+  ▼
+Infrastructure Recovery
+  │
+  ▼
+Database Recovery
+  │
+  ▼
+Knowledge Recovery
+  │
+  ▼
+Application Recovery
+  │
+  ▼
+Inference Verification
+  │
+  ▼
+Service Restoration
+```
+
+Recovery should be tested periodically.
+
+---
+
+# 23.34 Recovery Objectives
+
+The operational design should eventually establish:
+
+### Recovery Point Objective (RPO)
+
+How much data can be lost?
+
+### Recovery Time Objective (RTO)
+
+How quickly must the system be restored?
+
+These values should be determined from actual project requirements rather than invented merely for documentation.
+
+---
+
+# 23.35 CI/CD Architecture
+
+The deployment pipeline should automate repeatable verification.
+
+```text
+Developer
+    │
+    ▼
+Git Repository
+    │
+    ▼
+CI Pipeline
+    │
+    ├── Backend Tests
+    ├── Frontend Tests
+    ├── API Tests
+    ├── Knowledge Tests
+    ├── Security Checks
+    └── Build
+    │
+    ▼
+Container / Artifact
+    │
+    ▼
+Staging
+    │
+    ▼
+Acceptance Verification
+    │
+    ▼
+Production
+```
+
+The pipeline must prevent deployment of code that fails mandatory validation.
+
+---
+
+# 23.36 Deployment Gates
+
+A production release should pass at least:
+
+```text
+✓ Source validation
+✓ Dependency installation
+✓ Backend tests
+✓ Frontend tests
+✓ API tests
+✓ Knowledge-base tests
+✓ Integration tests
+✓ Security checks
+✓ Database migration checks
+✓ Container build
+✓ Staging deployment
+✓ Smoke tests
+```
+
+The detailed verification strategy will be formalized in Chapter 24.
+
+---
+
+# 23.37 Rollback Strategy
+
+Deployment must be reversible.
+
+```text
+New Release
+     │
+     ▼
+Production
+     │
+     ├── Healthy ──► Continue
+     │
+     └── Failure
+           │
+           ▼
+        Rollback
+```
+
+Rollback must consider more than application code.
+
+If a deployment includes:
+
+* database migrations;
+* knowledge-module changes;
+* configuration changes;
+
+then rollback must account for all three.
+
+---
+
+# 23.38 Knowledge Rollback
+
+Knowledge changes should be versioned independently.
+
+```text
+Knowledge v1
+     │
+     ▼
+Knowledge v2
+     │
+     ▼
+Problem Detected
+     │
+     ▼
+Reactivate v1
+```
+
+This is particularly important because a knowledge update may alter recommendation outcomes without changing the Django or React code.
+
+---
+
+# 23.39 Deployment Security
+
+Production infrastructure should apply:
+
+* least-privilege service accounts;
+* restricted database access;
+* restricted Prolog access;
+* secure secret storage;
+* HTTPS;
+* dependency patching;
+* firewall/network controls;
+* container isolation where applicable;
+* administrative access controls;
+* audit logging.
+
+The security architecture established in Chapter 16 remains authoritative; Chapter 23 translates those requirements into operational controls.
+
+---
+
+# 23.40 Dependency Management
+
+Dependencies should be pinned or constrained to reproducible versions.
+
+The deployment process should distinguish:
+
+```text
+Application Dependencies
+Infrastructure Dependencies
+Knowledge Dependencies
+Operating-System Dependencies
+```
+
+Security updates should be evaluated rather than blindly applied to production.
+
+---
+
+# 23.41 Scalability Architecture
+
+The initial deployment should prioritize correctness and operational simplicity.
+
+A reasonable scaling path is:
+
+```text
+                Load Balancer
+                     │
+          ┌──────────┼──────────┐
+          ▼          ▼          ▼
+       Django     Django     Django
+          │          │          │
+          └──────────┼──────────┘
+                     │
+                 PostgreSQL
+```
+
+However, Prolog changes the scalability problem.
+
+Scaling Django workers does not automatically produce safe or efficient scaling of symbolic inference.
+
+Therefore:
+
+> Inference capacity must be scaled according to the actual Prolog execution model.
+
+This is a key difference between NutriLogic and a conventional CRUD application.
+
+---
+
+# 23.42 Horizontal Scaling of Inference
+
+If inference demand increases, possible future architectures include:
+
+```text
+Django
+   │
+   ▼
+Inference Service
+   │
+   ├── Prolog Worker 1
+   ├── Prolog Worker 2
+   ├── Prolog Worker 3
+   └── Prolog Worker N
+```
+
+Such a design should only be adopted when workload measurements justify the additional operational complexity.
+
+The current architecture's Prolog adapter and process-local constraints must be respected rather than hidden behind a generic "microservices" label.
+
+---
+
+# 23.43 Deployment Topology Options
+
+Three deployment levels are considered.
+
+## Level 1 — Single-Host Deployment
+
+```text
+One Server
+│
+├── Reverse Proxy
+├── React
+├── Django
+├── SWI-Prolog
+└── PostgreSQL
+```
+
+Advantages:
+
+* low cost;
+* simple administration;
+* suitable for research prototype;
+* easy deployment.
+
+Disadvantages:
+
+* single point of failure;
+* limited scalability.
+
+---
+
+## Level 2 — Separated Services
+
+```text
+Frontend Server
+       │
+       ▼
+Application Server
+       │
+ ┌─────┴─────┐
+ ▼           ▼
+PostgreSQL  Prolog
+```
+
+Advantages:
+
+* stronger isolation;
+* independent scaling;
+* easier resource management.
+
+Disadvantages:
+
+* more operational complexity.
+
+---
+
+## Level 3 — Distributed Production
+
+```text
+Load Balancer
+      │
+ ┌────┼────┐
+ ▼    ▼    ▼
+API  API  API
+ │    │    │
+ └────┼────┘
+      │
+ ┌────┴────────────┐
+ ▼                 ▼
+Database      Inference Cluster
+```
+
+This should be treated as a future scaling architecture rather than assumed to be necessary for the initial deployment.
+
+---
+
+# 23.44 Recommended Deployment Strategy
+
+For the dissertation implementation, the recommended progression is:
+
+### Development
+
+```text
+Local React
++
+Local Django
++
+Local PostgreSQL
++
+Local SWI-Prolog
+```
+
+### Staging
+
+```text
+Dockerized React
++
+Dockerized Django
++
+PostgreSQL
++
+Controlled SWI-Prolog runtime
++
+HTTPS
+```
+
+### Production
+
+```text
+Reverse Proxy
+       │
+       ├── React static assets
+       │
+       ▼
+Django Application
+       │
+       ├── PostgreSQL
+       ├── Prolog Runtime
+       └── Optional Redis
+```
+
+This approach avoids premature distributed complexity while still establishing a production-capable architecture.
+
+---
+
+# 23.45 Operational Lifecycle
+
+The complete operational lifecycle is:
+
+```text
+Design
+  │
+  ▼
+Develop
+  │
+  ▼
+Test
+  │
+  ▼
+Build
+  │
+  ▼
+Deploy to Staging
+  │
+  ▼
+Validate
+  │
+  ▼
+Approve
+  │
+  ▼
+Deploy Production
+  │
+  ▼
+Monitor
+  │
+  ▼
+Maintain
+  │
+  ▼
+Retire / Rollback
+```
+
+Knowledge changes follow a parallel governed lifecycle.
+
+---
+
+# 23.46 Deployment and Clinical Safety
+
+Deployment architecture directly affects clinical safety.
+
+A system that is technically available but operating with:
+
+* an outdated knowledge module;
+* failed inference;
+* corrupted database;
+* incorrect configuration;
+* unavailable explanation data;
+
+must not silently continue producing apparently valid recommendations.
+
+Therefore, the operational architecture must support explicit states such as:
+
+```text
+READY
+DEGRADED
+INFERENCE_UNAVAILABLE
+KNOWLEDGE_UNAVAILABLE
+DATABASE_UNAVAILABLE
+MAINTENANCE
+```
+
+The application should fail safely when critical clinical infrastructure is unavailable.
+
+---
+
+# 23.47 Graceful Degradation
+
+Not every subsystem failure has the same consequence.
+
+For example:
+
+| Failure                          | Possible Behaviour                                                     |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| Analytics unavailable            | Core recommendations may continue                                      |
+| Notification service unavailable | Recommendation may continue                                            |
+| PostgreSQL unavailable           | Clinical workflow should fail safely                                   |
+| Prolog unavailable               | New symbolic recommendations should not be represented as successful   |
+| Explanation unavailable          | Recommendation presentation should indicate explanation unavailability |
+| Knowledge module invalid         | Affected inference capability should not activate                      |
+
+This prevents generic "system is down" logic from being applied to every operational failure.
+
+---
+
+# 23.48 Deployment Observability Matrix
+
+| Component       | Health Indicator        | Failure Impact                         |
+| --------------- | ----------------------- | -------------------------------------- |
+| React           | Asset availability      | UI unavailable                         |
+| Reverse Proxy   | HTTP/TLS health         | External access unavailable            |
+| Django          | API readiness           | Application unavailable                |
+| PostgreSQL      | Connection/readiness    | Persistence unavailable                |
+| SWI-Prolog      | Inference probe         | Reasoning unavailable                  |
+| Knowledge Store | Version/load validation | Knowledge-dependent functions affected |
+| Redis           | Connection health       | Optional features affected             |
+| Storage         | Read/write health       | Files/reports affected                 |
+
+---
+
+# 23.49 Quality Attributes
+
+| Attribute       | Deployment Mechanism                               |
+| --------------- | -------------------------------------------------- |
+| Availability    | Health checks, monitoring, controlled recovery     |
+| Security        | HTTPS, secrets management, network isolation       |
+| Reliability     | Backups, rollback, failure detection               |
+| Maintainability | Reproducible builds and versioned configuration    |
+| Scalability     | Separatable application and inference capacity     |
+| Recoverability  | RPO/RTO, backups, tested restoration               |
+| Observability   | Logs, metrics, health checks                       |
+| Clinical Safety | Safe failure and knowledge versioning              |
+| Reproducibility | Containerized or otherwise controlled environments |
+| Governance      | Controlled knowledge deployment                    |
+
+---
+
+# 23.50 Architecture Decision Record
+
+## ADR-023: Controlled Containerized Deployment with Explicit Prolog Runtime Boundaries
+
+### Status
+
+**Accepted**
+
+### Context
+
+NutriLogic combines React, Django, PostgreSQL, semantic knowledge infrastructure, and SWI-Prolog. The system therefore has runtime dependencies that cannot be treated as a conventional single-process web application.
+
+The symbolic reasoning engine also introduces process and concurrency considerations that make unrestricted horizontal scaling inappropriate without validation.
+
+### Decision
+
+NutriLogic shall adopt a reproducible deployment architecture in which the major runtime responsibilities are explicitly separated.
+
+Docker or an equivalent reproducible packaging mechanism may be used for deployment.
+
+The initial deployment shall prioritize:
+
+* operational simplicity;
+* deterministic inference;
+* secure configuration;
+* PostgreSQL persistence;
+* explicit Prolog runtime boundaries;
+* health monitoring;
+* controlled knowledge deployment.
+
+Distributed inference and large-scale horizontal scaling shall remain future extensions unless empirical workload measurements justify their introduction.
+
+### Rationale
+
+This approach:
+
+* preserves architectural boundaries;
+* reduces environment-specific failures;
+* supports reproducible deployment;
+* protects the Prolog reasoning subsystem from uncontrolled concurrency;
+* avoids premature microservice complexity;
+* provides a migration path toward distributed inference if required.
+
+### Consequences
+
+**Positive**
+
+* Reproducible deployment.
+* Clear infrastructure boundaries.
+* Safer Prolog execution.
+* Easier staging and production parity.
+* Better operational observability.
+
+**Trade-offs**
+
+* Container orchestration introduces additional operational knowledge.
+* Multiple runtime components increase deployment complexity.
+* Prolog scaling requires special consideration.
+* Production monitoring and backup procedures become mandatory.
+
+---
+
+# 23.51 Traceability Matrix
+
+| Requirement / Concern  | Deployment Realization                               |
+| ---------------------- | ---------------------------------------------------- |
+| Security               | HTTPS, network isolation, secrets management         |
+| Availability           | Health checks and monitoring                         |
+| Persistence            | PostgreSQL production deployment                     |
+| Symbolic reasoning     | Controlled SWI-Prolog runtime                        |
+| Explainability         | Persistent explanation data + inference availability |
+| Knowledge governance   | Versioned knowledge deployment                       |
+| Recommendation history | PostgreSQL persistence and backup                    |
+| Maintainability        | Reproducible builds                                  |
+| Scalability            | Separatable application/inference capacity           |
+| Recoverability         | Backup and restoration                               |
+| Auditability           | Operational and audit logging                        |
+| Clinical safety        | Safe failure and readiness controls                  |
+
+---
+
+# 23.52 Cross-Chapter Traceability
+
+| Chapter        | Deployment Dependency                                        |
+| -------------- | ------------------------------------------------------------ |
+| Chapter 5      | Non-functional requirements become operational requirements  |
+| Chapter 6      | System architecture becomes deployment topology              |
+| Chapter 10     | Clinical workflow becomes runtime workflow                   |
+| Chapters 11–15 | Symbolic reasoning becomes an operational Prolog dependency  |
+| Chapter 16     | Governance and safety become deployment controls             |
+| Chapter 17     | Integration contracts become runtime communication paths     |
+| Chapter 18     | Infrastructure View becomes concrete deployment              |
+| Chapter 19     | Application boundaries become runtime service boundaries     |
+| Chapter 20     | Persistence architecture becomes PostgreSQL deployment       |
+| Chapter 21     | REST API becomes deployed backend interface                  |
+| Chapter 22     | React architecture becomes deployed frontend                 |
+| Chapter 23     | Complete platform becomes operational                        |
+| Chapter 24     | Deployment is subjected to systematic testing and validation |
+
+---
+
+# 23.53 Deployment Conformance Rules
+
+The following rules govern production deployment.
+
+### Rule 1 — No Development Server in Production
+
+Development servers shall not be used as production application servers.
+
+### Rule 2 — No Public Database Exposure
+
+PostgreSQL shall not be directly exposed to the public Internet.
+
+### Rule 3 — Controlled Prolog Execution
+
+SWI-Prolog execution shall follow the concurrency and lifecycle constraints of the selected integration architecture.
+
+### Rule 4 — No Production Secrets in Source Control
+
+Secrets shall be injected through secure configuration mechanisms.
+
+### Rule 5 — Versioned Knowledge
+
+Production knowledge modules shall be versioned and traceable.
+
+### Rule 6 — Tested Backups
+
+Backups shall be periodically restored in a controlled environment.
+
+### Rule 7 — Health Monitoring
+
+Critical services shall expose operational health information.
+
+### Rule 8 — Safe Clinical Failure
+
+Inference failures shall never be represented as successful clinical recommendations.
+
+### Rule 9 — Controlled Deployment
+
+Production deployment shall pass defined verification gates.
+
+### Rule 10 — Reversible Releases
+
+Application and knowledge deployments shall have a rollback strategy.
+
+---
+
+# 23.54 Chapter Summary
+
+This chapter has established the Deployment and Operations Architecture for NutriLogic.
+
+The architecture separates the React presentation layer, Django application layer, PostgreSQL persistence layer, SWI-Prolog reasoning environment, knowledge artefacts, and operational infrastructure while preserving the architectural boundaries established in previous chapters.
+
+Particular attention has been given to the operational implications of integrating SWI-Prolog through PySWIP. Unlike a conventional CRUD application, NutriLogic cannot assume that adding more web workers automatically provides safe or efficient inference scaling. The deployment must therefore explicitly account for Prolog process boundaries and concurrency.
+
+The chapter has also established development, testing, staging, and production environments; configuration and secret-management principles; HTTPS and network boundaries; health checks; logging; monitoring; backups; disaster recovery; CI/CD; rollback; knowledge deployment; and safe degradation.
+
+The resulting architecture provides a controlled path from a development installation to a production-capable system while avoiding premature infrastructure complexity.
+
+Most importantly, deployment is treated as part of the clinical safety architecture rather than merely an IT concern. Availability of the reasoning engine, integrity of the knowledge base, persistence of recommendations and explanations, and correctness of configuration directly affect the trustworthiness of the decision-support system.
+
+---
+
+# Chapter 24: Testing, Verification, and Validation Framework
+
+## 24.1 Introduction
+
+The architectural development of NutriLogic establishes a system that combines conventional software engineering with ontology-driven knowledge representation, symbolic reasoning, clinical decision support, and explainability.
+
+Such a system cannot be adequately assessed through conventional software testing alone.
+
+A successful compilation, passing API test, or functional user interface does not establish that the resulting clinical decision-support behaviour is correct, safe, explainable, or semantically consistent.
+
+Chapter 24 therefore establishes the **Testing, Verification, and Validation (V&V) Framework** for NutriLogic.
+
+The framework translates the system requirements, architectural principles, domain models, knowledge engineering framework, ontology, knowledge graph, Prolog reasoning engine, REST API, frontend, and deployment architecture into a structured testing programme.
+
+The architecture explicitly establishes testability as a fundamental principle. Every architectural component is expected to be independently testable, with testing encompassing unit testing, integration testing, clinical validation, knowledge regression, and performance evaluation.
+
+The framework therefore distinguishes between four related but different questions:
+
+1. **Verification:** Was the system built according to its specified design and requirements?
+2. **Validation:** Does the implemented system behave appropriately for its intended clinical decision-support purpose?
+3. **Safety verification:** Does the system prevent or appropriately handle known unsafe states?
+4. **Evaluation:** How well does the system perform against the research objectives?
+
+The first three are addressed in this chapter.
+
+The broader empirical evaluation of the system is reserved for **Chapter 25: System Evaluation**.
+
+---
+
+# 24.2 Testing Philosophy
+
+NutriLogic adopts a layered testing philosophy.
+
+```text
+Requirements
+     │
+     ▼
+Architecture
+     │
+     ▼
+Domain Logic
+     │
+     ▼
+Knowledge Representation
+     │
+     ▼
+Symbolic Reasoning
+     │
+     ▼
+Application Integration
+     │
+     ▼
+REST API
+     │
+     ▼
+Frontend
+     │
+     ▼
+Deployment
+     │
+     ▼
+End-to-End Clinical Workflow
+```
+
+Testing must operate at every level.
+
+A failure at a lower level should be detected as early as possible rather than first appearing during an end-to-end clinical test.
+
+---
+
+# 24.3 Objectives
+
+The testing and validation framework aims to:
+
+1. Verify compliance with functional requirements.
+2. Verify compliance with non-functional requirements.
+3. Validate the correctness of domain logic.
+4. Validate persistence and repository behaviour.
+5. Validate REST API contracts.
+6. Validate frontend behaviour.
+7. Verify ontology consistency.
+8. Verify knowledge-graph integrity.
+9. Verify Prolog rule correctness.
+10. Validate the transformation between domain objects and symbolic facts.
+11. Verify recommendation generation.
+12. Verify explanation generation.
+13. Verify clinical safety constraints.
+14. Verify knowledge-version traceability.
+15. Detect regressions following knowledge or software changes.
+16. Evaluate system behaviour under failure conditions.
+17. Establish reproducible automated testing.
+18. Provide traceability between requirements and test cases.
+19. Establish objective acceptance criteria.
+20. Provide a defensible foundation for the empirical evaluation presented in Chapter 25.
+
+---
+
+# 24.4 Verification and Validation Model
+
+The framework adopts the following distinction.
+
+### Verification
+
+Verification asks:
+
+> **Did we build the system correctly according to its specification?**
+
+Examples include:
+
+* API schema conforms to specification;
+* database constraints are implemented;
+* Prolog predicates behave according to defined rules;
+* ontology classes conform to the intended model;
+* authentication requirements are enforced.
+
+### Validation
+
+Validation asks:
+
+> **Did we build the correct system for its intended purpose?**
+
+Examples include:
+
+* nutrition assessments produce appropriate decision-support outputs;
+* recommendations respect clinical constraints;
+* explanations accurately represent reasoning;
+* users can understand the resulting information;
+* the system behaves appropriately for intended clinical scenarios.
+
+This distinction prevents technical correctness from being mistaken for clinical appropriateness.
+
+---
+
+# 24.5 Verification and Validation Layers
+
+NutriLogic adopts seven principal testing layers.
+
+```text
+                 ┌─────────────────────┐
+                 │ Clinical Validation │
+                 └──────────┬──────────┘
+                            │
+                 ┌──────────▼──────────┐
+                 │ End-to-End Testing  │
+                 └──────────┬──────────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │ Integration Testing       │
+              └─────────────┬─────────────┘
+                            │
+          ┌─────────────────▼─────────────────┐
+          │ API / Application Testing         │
+          └─────────────────┬─────────────────┘
+                            │
+        ┌───────────────────▼───────────────────┐
+        │ Domain / Knowledge / Reasoning Tests  │
+        └───────────────────┬───────────────────┘
+                            │
+                ┌───────────▼───────────┐
+                │ Unit Testing          │
+                └───────────────────────┘
+```
+
+Cross-cutting all layers are:
+
+* security testing;
+* performance testing;
+* regression testing;
+* deployment verification.
+
+---
+
+# 24.6 Requirements Traceability
+
+Testing shall maintain explicit traceability between requirements and test cases.
+
+The architecture already maps major functional requirements to architectural components, including user management, assessment, knowledge, inference, explainability, intervention, monitoring, REST interfaces, and frontend integration.
+
+The testing framework extends this relationship:
+
+| Requirement                        | Test Layer              | Evidence                |
+| ---------------------------------- | ----------------------- | ----------------------- |
+| FR-001 User Registration           | API / Integration       | Registration test suite |
+| FR-002 Authentication              | Security / API          | Authentication tests    |
+| FR-003 Profile Management          | Domain / API            | Profile tests           |
+| FR-004 Nutrition Assessment        | Domain / API            | Assessment test suite   |
+| FR-005 Nutrition Diagnosis         | Reasoning / Integration | Prolog inference tests  |
+| FR-006 Therapeutic Recommendations | Reasoning / Clinical    | Recommendation tests    |
+| FR-007 Explainability              | Integration / Clinical  | Explanation tests       |
+| FR-009 Monitoring                  | Domain / API            | Monitoring tests        |
+| FR-010 REST Interface              | API                     | Contract tests          |
+| FR-011 Frontend Integration        | E2E                     | Workflow tests          |
+
+The exact requirement identifiers shall remain synchronized with Chapter 5.
+
+---
+
+# 24.7 Test Levels
+
+## 24.7.1 Unit Testing
+
+Unit testing isolates the smallest meaningful software component.
+
+Candidates include:
+
+* value objects;
+* domain entities;
+* domain services;
+* application services;
+* serializers;
+* repository mappings;
+* utility functions;
+* React components;
+* Prolog predicates.
+
+Unit tests should avoid unnecessary external dependencies.
+
+---
+
+## 24.7.2 Integration Testing
+
+Integration testing verifies collaboration between components.
+
+Examples:
+
+```text
+Django ↔ PostgreSQL
+Django ↔ Prolog
+Django ↔ Knowledge Repository
+Django ↔ REST Layer
+React ↔ REST API
+```
+
+Integration tests identify failures that isolated unit tests cannot detect.
+
+---
+
+## 24.7.3 System Testing
+
+System testing evaluates the integrated NutriLogic platform as a complete system.
+
+A typical workflow is:
+
+```text
+Login
+  │
+  ▼
+Patient Profile
+  │
+  ▼
+Nutrition Assessment
+  │
+  ▼
+Assessment Validation
+  │
+  ▼
+Symbolic Inference
+  │
+  ▼
+Diagnosis
+  │
+  ▼
+Intervention
+  │
+  ▼
+Explanation
+  │
+  ▼
+Recommendation Display
+  │
+  ▼
+Monitoring
+```
+
+---
+
+## 24.7.4 End-to-End Testing
+
+End-to-end tests exercise the complete externally observable workflow.
+
+The objective is not to test every internal implementation detail but to establish that the system performs the intended user-visible workflow.
+
+---
+
+# 24.8 Domain Model Testing
+
+The Domain Layer is one of the most important testing targets because clinical rules should not be hidden inside HTTP or persistence mechanisms.
+
+Tests shall cover:
+
+* valid domain states;
+* invalid domain states;
+* value-object invariants;
+* entity state transitions;
+* domain services;
+* clinical validation;
+* aggregate boundaries.
+
+For example, an assessment domain test may verify that an assessment containing impossible or internally inconsistent measurements is rejected before inference.
+
+---
+
+# 24.9 Value Object Testing
+
+Value objects such as:
+
+* BMI;
+* Blood Pressure;
+* Dietary Diversity Score;
+* Measurement;
+* Clinical Observation;
+
+should have deterministic tests.
+
+Example:
+
+```text
+Input
+Height = valid
+Weight = valid
+
+Expected
+BMI = mathematically correct value
+```
+
+Boundary tests should also be included.
+
+```text
+normal
+lower boundary
+upper boundary
+invalid
+missing
+```
+
+The objective is to ensure that clinical calculations are not silently corrupted by invalid input.
+
+---
+
+# 24.10 Application-Service Testing
+
+Application services coordinate domain operations.
+
+They should be tested using mocked ports and repositories where appropriate.
+
+For example:
+
+```text
+AssessmentApplicationService
+        │
+        ├── Mock Assessment Repository
+        ├── Mock Inference Engine
+        └── Mock Explanation Repository
+```
+
+This allows orchestration logic to be tested without requiring a live PostgreSQL or Prolog environment.
+
+---
+
+# 24.11 Repository Testing
+
+Repository implementations must verify the mapping between domain objects and persistence models.
+
+Tests shall cover:
+
+* creation;
+* retrieval;
+* update;
+* deletion where permitted;
+* transaction behaviour;
+* mapping correctness;
+* constraint violations;
+* missing records;
+* historical record retrieval.
+
+Particular attention should be given to clinical records that must remain historically traceable.
+
+---
+
+# 24.12 Database Testing
+
+Database tests shall verify:
+
+* schema constraints;
+* foreign keys;
+* uniqueness constraints;
+* nullability;
+* indexing assumptions;
+* transaction behaviour;
+* migrations;
+* historical data preservation.
+
+A migration should be considered verified only after it succeeds against a representative database state.
+
+---
+
+# 24.13 API Testing
+
+The REST API shall be tested at the contract level.
+
+Testing should cover:
+
+* endpoint availability;
+* HTTP methods;
+* request validation;
+* response schemas;
+* status codes;
+* authentication;
+* authorization;
+* pagination;
+* filtering;
+* error responses;
+* invalid payloads.
+
+Example:
+
+```text
+POST /api/assessments/
+```
+
+shall be tested for:
+
+```text
+Valid Request
+     ↓
+201 Created
+
+Invalid Request
+     ↓
+400 Bad Request
+
+Unauthenticated Request
+     ↓
+401 Unauthorized
+
+Unauthorized User
+     ↓
+403 Forbidden
+```
+
+The exact status codes must remain consistent with the API contract established in Chapter 21.
+
+---
+
+# 24.14 Authentication and Authorization Testing
+
+Security tests shall verify:
+
+* valid login;
+* invalid credentials;
+* expired tokens;
+* malformed tokens;
+* revoked credentials where implemented;
+* role restrictions;
+* object-level authorization;
+* unauthorized patient-data access.
+
+A critical test is:
+
+> Can one authenticated user retrieve another patient's protected clinical information?
+
+The expected result must be **denial** unless explicitly authorized by the system's access-control model.
+
+---
+
+# 24.15 Frontend Testing
+
+Frontend testing shall include:
+
+### Component Testing
+
+Examples:
+
+* assessment forms;
+* recommendation cards;
+* explanation panels;
+* patient profile components;
+* navigation components.
+
+### Interaction Testing
+
+Examples:
+
+* form submission;
+* validation;
+* loading states;
+* error states;
+* authentication transitions.
+
+### Integration Testing
+
+Frontend behaviour shall be tested against the API contract.
+
+### End-to-End Testing
+
+Representative clinical workflows should be exercised through the actual interface.
+
+---
+
+# 24.16 Ontology Verification
+
+The Nutrition Ontology is an authoritative vocabulary across the system.
+
+The architecture explicitly establishes that semantic concepts originate from the ontology and that it provides vocabulary for symbolic reasoning, APIs, database mappings, knowledge graphs, and explanation mechanisms.
+
+Ontology verification shall therefore examine:
+
+* class consistency;
+* property consistency;
+* domain/range constraints;
+* subclass relationships;
+* naming consistency;
+* duplicate concepts;
+* orphan concepts;
+* invalid relationships;
+* terminology alignment.
+
+A semantic concept must not silently acquire a second incompatible representation elsewhere in the system.
+
+---
+
+# 24.17 Ontology Regression Testing
+
+Changes to the ontology can affect:
+
+* Prolog rules;
+* knowledge graph queries;
+* database mappings;
+* API payloads;
+* explanation generation.
+
+Therefore, ontology changes must trigger regression testing.
+
+```text
+Ontology Change
+      │
+      ▼
+Ontology Validation
+      │
+      ├── Prolog Tests
+      ├── Knowledge Graph Tests
+      ├── API Tests
+      └── Explanation Tests
+```
+
+This follows the architectural requirement for semantic consistency and avoidance of duplicate or ambiguous representations.
+
+---
+
+# 24.18 Knowledge Graph Validation
+
+The knowledge graph shall be tested for:
+
+* valid nodes;
+* valid relationships;
+* ontology conformity;
+* missing relationships;
+* invalid relationships;
+* duplicate concepts;
+* dangling references;
+* provenance;
+* version consistency.
+
+Example:
+
+```text
+Food
+  │
+  ├── hasNutrient ──► Nutrient
+  │
+  ├── suitableFor ──► Condition
+  │
+  └── contraindicatedFor ──► Condition
+```
+
+The graph must not contain relationships that contradict the authoritative ontology or governed knowledge model.
+
+---
+
+# 24.19 Knowledge Provenance Testing
+
+Every governed knowledge item should be traceable to:
+
+* source;
+* version;
+* author/steward where applicable;
+* validation state;
+* activation state.
+
+The architecture requires evidence-based recommendations whose knowledge sources are traceable, versioned, and reviewable.
+
+A test should therefore verify that a recommendation can be associated with the knowledge version that generated it.
+
+---
+
+# 24.20 Prolog Rule Testing
+
+The symbolic reasoning engine requires a dedicated testing layer.
+
+Individual rules should be tested using known facts and expected conclusions.
+
+Example:
+
+```text
+Given:
+    elevated_bmi(patient)
+    hypertension(patient)
+
+Expected:
+    nutrition_risk(patient, elevated_cardiometabolic_risk)
+```
+
+The test must establish:
+
+1. expected rule activation;
+2. expected conclusion;
+3. absence of unintended conclusions.
+
+---
+
+# 24.21 Positive and Negative Rule Tests
+
+Rule testing shall contain both:
+
+### Positive Cases
+
+Conditions are satisfied.
+
+```text
+Facts
+  ↓
+Rule activates
+  ↓
+Expected conclusion
+```
+
+### Negative Cases
+
+Conditions are not satisfied.
+
+```text
+Incomplete / conflicting facts
+  ↓
+Rule does not activate
+  ↓
+Conclusion absent
+```
+
+Negative testing is essential because an incorrect rule may be more dangerous when it produces recommendations from insufficient evidence.
+
+---
+
+# 24.22 Rule Conflict Testing
+
+The reasoning engine shall be tested for conflicting rules.
+
+Example:
+
+```text
+Rule A → Recommendation X
+
+Rule B → Recommendation Y
+
+X conflicts with Y
+```
+
+The expected system behaviour must be explicitly defined.
+
+Possible outcomes include:
+
+* conflict resolution;
+* prioritization;
+* suppression;
+* escalation;
+* no recommendation.
+
+The system must never silently select a clinically unsafe result.
+
+---
+
+# 24.23 Contraindication Testing
+
+Contraindications require dedicated tests.
+
+Example:
+
+```text
+Patient
+   │
+   ├── Condition A
+   └── Allergy B
+          │
+          ▼
+Candidate Intervention
+          │
+          ▼
+Contraindication Check
+          │
+          ▼
+Rejected
+```
+
+Tests shall establish that prohibited recommendations cannot pass through the clinical decision pipeline.
+
+---
+
+# 24.24 Allergy Validation Testing
+
+Allergy information shall be treated as a hard clinical constraint where applicable.
+
+Tests should include:
+
+* direct food allergy;
+* ingredient-level allergy;
+* missing allergy data;
+* conflicting allergy records;
+* candidate recommendation containing an allergen.
+
+The expected behaviour must be explicitly defined for each case.
+
+---
+
+# 24.25 Clinical Safety Verification
+
+Clinical safety is a first-class architectural principle.
+
+The architecture states that patient safety takes precedence over recommendation completeness, performance, and convenience. Safety mechanisms include contraindication checking, allergy validation, conflict detection, evidence verification, and conservative fallback behaviour.
+
+Accordingly, safety tests shall include:
+
+* invalid clinical state;
+* contraindication;
+* allergy;
+* conflicting evidence;
+* missing required data;
+* unavailable knowledge;
+* inference failure;
+* stale knowledge;
+* ambiguous result.
+
+The expected behaviour should generally favour safe non-generation over unsupported recommendation generation.
+
+---
+
+# 24.26 Assessment-to-Inference Integration Testing
+
+The central clinical pipeline shall be tested as an integrated workflow.
+
+```text
+Nutrition Assessment
+        │
+        ▼
+Validation
+        │
+        ▼
+Assessment Facts
+        │
+        ▼
+Prolog Bridge
+        │
+        ▼
+Symbolic Reasoning
+        │
+        ▼
+Nutrition Diagnosis
+        │
+        ▼
+Intervention
+        │
+        ▼
+Explanation Session
+```
+
+The test must verify not merely that each component works independently but that information is transformed correctly between them.
+
+---
+
+# 24.27 Assessment Fact Translation Testing
+
+The transformation from domain assessment data to symbolic facts is a critical boundary.
+
+Example:
+
+```text
+Domain:
+BMI = 31.4
+
+        ↓
+
+Symbolic representation:
+
+bmi(patient, 31.4).
+bmi_category(patient, elevated).
+```
+
+Tests must verify:
+
+* correct predicate;
+* correct argument;
+* correct semantic mapping;
+* correct units;
+* absence of accidental information loss.
+
+---
+
+# 24.28 Inference Output Mapping Testing
+
+The reverse transformation must also be verified.
+
+```text
+Prolog
+   │
+   ▼
+Symbolic Result
+   │
+   ▼
+Inference Adapter
+   │
+   ▼
+Domain Recommendation
+```
+
+Tests should verify that symbolic results are not incorrectly transformed into domain objects.
+
+---
+
+# 24.29 Explainability Testing
+
+Explainability is not a decorative interface feature.
+
+The architecture explicitly requires every recommendation to be explainable, including supporting evidence, applied rules, intermediate conclusions, knowledge sources, and final recommendations.
+
+Therefore, explanation tests shall verify:
+
+* evidence is present;
+* rules are identifiable;
+* intermediate conclusions are represented where applicable;
+* knowledge source is traceable;
+* final recommendation corresponds to the reasoning result.
+
+---
+
+# 24.30 Explanation Fidelity Testing
+
+A particularly important test is **explanation fidelity**.
+
+The explanation must not claim that a rule was applied when it was not.
+
+```text
+Actual Reasoning
+      │
+      ▼
+Rule A → Conclusion B
+      │
+      ▼
+Explanation
+      │
+      └── Must describe Rule A → B
+```
+
+An explanation generated independently of the actual reasoning trace would create a serious trustworthiness problem.
+
+---
+
+# 24.31 Recommendation Determinism Testing
+
+Given the same:
+
+* patient state;
+* assessment facts;
+* knowledge version;
+* rule version;
+* configuration;
+
+the deterministic symbolic reasoning layer should produce the same result.
+
+Formally:
+
+```text
+f(A, K, R, C) = O
+```
+
+where:
+
+* `A` = assessment state;
+* `K` = knowledge version;
+* `R` = rule version;
+* `C` = relevant configuration;
+* `O` = reasoning output.
+
+Repeated execution should produce equivalent `O`.
+
+Where non-determinism exists elsewhere in the system, it must be explicitly documented.
+
+---
+
+# 24.32 Knowledge Regression Testing
+
+Knowledge changes are software changes in their clinical effect, even when source code is unchanged.
+
+Therefore:
+
+```text
+Knowledge v1
+     │
+     ▼
+Baseline Test Suite
+     │
+     ▼
+Knowledge v2
+     │
+     ▼
+Regression Suite
+     │
+     ▼
+Compare Outputs
+```
+
+Regression tests should identify:
+
+* changed diagnoses;
+* changed recommendations;
+* removed recommendations;
+* newly introduced recommendations;
+* changed contraindication behaviour;
+* changed explanations.
+
+---
+
+# 24.33 Golden Clinical Cases
+
+A controlled set of representative clinical scenarios should serve as **golden test cases**.
+
+Each case contains:
+
+```text
+Patient State
++
+Assessment
++
+Knowledge Version
++
+Expected Clinical Decision
++
+Expected Safety Constraints
++
+Expected Explanation Characteristics
+```
+
+These cases form a stable regression baseline.
+
+The golden cases should not be interpreted as a substitute for clinical validation; they are controlled verification artefacts.
+
+---
+
+# 24.34 Example Golden Case
+
+```text
+Case ID: GC-001
+
+Assessment:
+- anthropometric observations
+- dietary observations
+- relevant medical history
+- relevant allergies
+
+Expected:
+- assessment accepted
+- applicable symbolic rules activated
+- contraindicated interventions rejected
+- recommendation generated only where justified
+- explanation trace available
+```
+
+The actual clinical values and expected outputs should be defined from the validated knowledge base and reviewed appropriately.
+
+---
+
+# 24.35 Missing-Data Testing
+
+The system must explicitly test incomplete assessments.
+
+Examples:
+
+```text
+Missing weight
+Missing height
+Missing allergy information
+Missing diagnosis
+Missing dietary history
+Missing laboratory value
+```
+
+The system must distinguish:
+
+```text
+Unknown
+```
+
+from:
+
+```text
+False
+```
+
+This distinction is critical for symbolic reasoning.
+
+Missing information must not automatically be interpreted as absence of a clinical condition.
+
+---
+
+# 24.36 Boundary Testing
+
+Boundary-value tests should be applied to:
+
+* anthropometric measurements;
+* laboratory values;
+* scoring systems;
+* risk thresholds;
+* recommendation thresholds;
+* pagination;
+* authentication expiry;
+* API payload sizes.
+
+For a threshold:
+
+```text
+below threshold
+exactly at threshold
+above threshold
+```
+
+must be tested independently.
+
+---
+
+# 24.37 Invalid-Input Testing
+
+The API and domain layers shall reject:
+
+* malformed data;
+* impossible measurements;
+* invalid dates;
+* unsupported enumerations;
+* duplicate submissions where prohibited;
+* invalid identifiers;
+* unexpected fields where strict validation is required.
+
+The objective is to prevent invalid states from propagating into the reasoning engine.
+
+---
+
+# 24.38 Security Testing
+
+Security testing shall include:
+
+### Authentication
+
+* credential attacks;
+* token manipulation;
+* token expiry.
+
+### Authorization
+
+* privilege escalation;
+* cross-user access;
+* unauthorized administrative actions.
+
+### Input Security
+
+* injection;
+* malformed payloads;
+* malicious strings;
+* oversized requests.
+
+### Session Security
+
+* token handling;
+* secure storage;
+* logout behaviour.
+
+### Infrastructure
+
+* exposed services;
+* insecure configuration;
+* secret leakage.
+
+---
+
+# 24.39 Privacy Testing
+
+Privacy-by-design requirements include data minimization, access control, secure storage, purpose limitation, and retention management.
+
+Testing should therefore establish:
+
+* only authorized users can access protected records;
+* unnecessary clinical data is not returned;
+* sensitive information does not appear in ordinary logs;
+* data retention rules are enforced where implemented;
+* exported data respects authorization constraints.
+
+---
+
+# 24.40 Performance Testing
+
+Performance testing should evaluate:
+
+* API latency;
+* database latency;
+* inference latency;
+* explanation generation latency;
+* frontend rendering;
+* concurrent requests;
+* system throughput.
+
+Performance testing should distinguish between ordinary CRUD operations and symbolic inference.
+
+---
+
+# 24.41 Inference Performance Testing
+
+The primary inference metrics are:
+
+```text
+Inference latency
+Inference throughput
+Rule evaluation time
+Knowledge loading time
+Explanation generation time
+Inference failure rate
+```
+
+Testing should establish baseline performance rather than relying on subjective statements such as "the system is fast."
+
+---
+
+# 24.42 Load Testing
+
+Load tests should progressively increase demand.
+
+```text
+10 users
+   ↓
+25 users
+   ↓
+50 users
+   ↓
+100 users
+   ↓
+Higher load where justified
+```
+
+The actual test levels should be determined by the expected deployment environment and available infrastructure.
+
+The purpose is to identify:
+
+* saturation;
+* latency growth;
+* database contention;
+* Prolog contention;
+* memory exhaustion;
+* failure thresholds.
+
+---
+
+# 24.43 Stress Testing
+
+Stress testing intentionally exceeds normal expected workload.
+
+The objective is to determine:
+
+* failure behaviour;
+* recovery behaviour;
+* resource exhaustion;
+* degraded-mode behaviour.
+
+For NutriLogic, stress testing must ensure that resource pressure does not result in false clinical success states.
+
+---
+
+# 24.44 Reliability Testing
+
+Reliability tests should simulate failures such as:
+
+```text
+Database unavailable
+Prolog unavailable
+Knowledge module unavailable
+Network failure
+Expired credentials
+Storage failure
+Worker failure
+```
+
+The expected result should be explicit.
+
+For example:
+
+```text
+Prolog unavailable
+       │
+       ▼
+Inference failure
+       │
+       ▼
+No successful recommendation
+       │
+       ▼
+Safe error / controlled fallback
+```
+
+---
+
+# 24.45 Deployment Verification
+
+Chapter 23 established deployment health checks and readiness mechanisms.
+
+Chapter 24 verifies them.
+
+Deployment tests should confirm:
+
+* application starts correctly;
+* migrations execute successfully;
+* database connection works;
+* Prolog runtime is available;
+* knowledge modules load;
+* health endpoint responds;
+* HTTPS works;
+* frontend assets load;
+* API is reachable;
+* monitoring captures expected events.
+
+---
+
+# 24.46 Backup and Recovery Testing
+
+Backup verification must include actual restoration.
+
+```text
+Backup
+  │
+  ▼
+Restore
+  │
+  ▼
+Integrity Verification
+  │
+  ▼
+Application Connection
+  │
+  ▼
+Clinical Record Verification
+```
+
+A successful backup command alone is insufficient evidence of recoverability.
+
+---
+
+# 24.47 Disaster-Recovery Testing
+
+The system should periodically simulate critical failures.
+
+Examples:
+
+* database loss;
+* application failure;
+* corrupted deployment;
+* knowledge-version rollback.
+
+The objective is to establish that the system can recover to a known-good state.
+
+---
+
+# 24.48 User Acceptance Testing
+
+User acceptance testing assesses whether intended users can successfully perform required workflows.
+
+Potential participants may include:
+
+* intended system users;
+* nutrition professionals;
+* technical stakeholders;
+* project supervisors.
+
+Tasks should reflect actual system functions rather than generic usability exercises.
+
+Examples:
+
+```text
+Register
+Login
+Create Profile
+Complete Assessment
+Review Recommendation
+Inspect Explanation
+Review Monitoring Information
+```
+
+---
+
+# 24.49 Clinical Validation
+
+Clinical validation is distinct from software correctness.
+
+The purpose is to determine whether the system's outputs are appropriate relative to the validated clinical knowledge and intended decision-support use.
+
+Validation should examine:
+
+* diagnostic reasoning;
+* intervention appropriateness;
+* contraindication handling;
+* evidence alignment;
+* explanation adequacy.
+
+The system should be positioned as **clinical decision support**, not as an autonomous replacement for qualified clinical judgement.
+
+---
+
+# 24.50 Clinical Validation Dataset
+
+A validation dataset should contain representative cases covering:
+
+* normal nutrition states;
+* common nutrition-related conditions;
+* high-risk conditions;
+* contraindications;
+* allergies;
+* incomplete assessments;
+* conflicting observations;
+* edge cases.
+
+The dataset should be versioned and controlled.
+
+---
+
+# 24.51 Expert Review
+
+Where clinical validation is required, domain experts should review representative outputs.
+
+The review process may assess:
+
+| Dimension      | Question                                 |
+| -------------- | ---------------------------------------- |
+| Correctness    | Is the output clinically appropriate?    |
+| Safety         | Does it avoid unsafe recommendations?    |
+| Relevance      | Does it address the presented condition? |
+| Evidence       | Is the recommendation supported?         |
+| Explainability | Is the reasoning understandable?         |
+| Consistency    | Are similar cases treated consistently?  |
+
+Expert review results should be recorded as validation evidence.
+
+---
+
+# 24.52 Acceptance Criteria
+
+A system feature should not be considered validated merely because its implementation exists.
+
+Acceptance requires:
+
+```text
+Requirement
+   │
+   ▼
+Implementation
+   │
+   ▼
+Verification
+   │
+   ▼
+Validation
+   │
+   ▼
+Acceptance
+```
+
+For clinically relevant functionality, both technical and domain-level acceptance criteria may apply.
+
+---
+
+# 24.53 Test Case Structure
+
+Each formal test case should contain:
+
+| Field           | Description                       |
+| --------------- | --------------------------------- |
+| Test ID         | Unique identifier                 |
+| Requirement     | Related requirement               |
+| Objective       | What is being tested              |
+| Preconditions   | Required system state             |
+| Input           | Test data                         |
+| Procedure       | Execution steps                   |
+| Expected Result | Expected behaviour                |
+| Actual Result   | Observed behaviour                |
+| Status          | Pass/Fail                         |
+| Evidence        | Logs, screenshots, output         |
+| Version         | Tested software/knowledge version |
+
+This creates reproducible evidence rather than informal assertions.
+
+---
+
+# 24.54 Defect Classification
+
+Defects should be categorized according to impact.
+
+### Critical
+
+Potentially unsafe clinical output, severe security breach, or catastrophic data loss.
+
+### High
+
+Major clinical or functional failure.
+
+### Medium
+
+Significant functionality degradation without immediate critical safety consequences.
+
+### Low
+
+Minor usability or cosmetic issue.
+
+Critical and high-severity defects affecting clinical decision support should block production release until appropriately resolved or formally accepted through governance.
+
+---
+
+# 24.55 Regression Testing
+
+Regression testing shall execute after:
+
+* software changes;
+* database changes;
+* ontology changes;
+* knowledge changes;
+* Prolog rule changes;
+* API changes;
+* frontend changes;
+* infrastructure changes.
+
+The regression suite should prioritize critical workflows.
+
+---
+
+# 24.56 Continuous Integration Quality Gates
+
+The CI pipeline should enforce automated gates.
+
+```text
+Commit
+  │
+  ▼
+Lint / Static Checks
+  │
+  ▼
+Unit Tests
+  │
+  ▼
+Domain Tests
+  │
+  ▼
+Knowledge Tests
+  │
+  ▼
+API Tests
+  │
+  ▼
+Integration Tests
+  │
+  ▼
+Build
+  │
+  ▼
+Deploy to Test Environment
+  │
+  ▼
+Smoke Tests
+```
+
+A failed mandatory gate should prevent promotion.
+
+---
+
+# 24.57 Test Environment Isolation
+
+Testing environments must not accidentally operate on real production clinical data.
+
+Test data should be:
+
+* synthetic;
+* anonymized;
+* appropriately controlled.
+
+Production credentials must not be reused in automated test environments.
+
+---
+
+# 24.58 Test Data Governance
+
+Test datasets should be versioned.
+
+Each dataset should identify:
+
+* source;
+* creation method;
+* schema version;
+* knowledge version;
+* expected outputs where applicable.
+
+This is particularly important for regression testing because changing the test data itself can make historical test results difficult to reproduce.
+
+---
+
+# 24.59 Testing the Neuro-Symbolic Boundary
+
+The neuro-symbolic architecture requires explicit boundary testing.
+
+The system should verify that:
+
+```text
+Semantic Knowledge
+        │
+        ▼
+Knowledge Graph
+        │
+        ▼
+Symbolic Facts
+        │
+        ▼
+Prolog Rules
+        │
+        ▼
+Inference
+        │
+        ▼
+Explanation
+```
+
+remains semantically consistent.
+
+A defect in the transformation between these layers can produce incorrect results even when the individual components appear correct.
+
+---
+
+# 24.60 Future Machine-Learning Boundary
+
+The architecture permits future machine-learning components but states that such components may augment rather than obscure or replace the explainable symbolic reasoning process without appropriate governance and validation.
+
+Any future ML integration must therefore introduce additional tests for:
+
+* model correctness;
+* model versioning;
+* feature consistency;
+* drift;
+* reproducibility;
+* explainability;
+* interaction with symbolic rules;
+* safety boundaries.
+
+ML functionality must not bypass the existing governance architecture.
+
+---
+
+# 24.61 Test Coverage Model
+
+Coverage shall be considered across multiple dimensions.
+
+### Code Coverage
+
+Measures exercised software code.
+
+### Requirement Coverage
+
+Measures requirements with corresponding tests.
+
+### Domain Coverage
+
+Measures clinical/domain scenarios exercised.
+
+### Rule Coverage
+
+Measures symbolic rules exercised.
+
+### Knowledge Coverage
+
+Measures governed knowledge concepts represented in validation cases.
+
+### Safety Coverage
+
+Measures identified safety constraints exercised.
+
+High code coverage alone does not imply high clinical coverage.
+
+---
+
+# 24.62 Proposed Test Coverage Matrix
+
+| Layer           | Coverage Target                   |
+| --------------- | --------------------------------- |
+| Domain          | Critical domain logic             |
+| Application     | All major use cases               |
+| Repository      | All persistence operations        |
+| API             | All public endpoints              |
+| Frontend        | Critical user workflows           |
+| Ontology        | All critical concepts/relations   |
+| Knowledge Graph | Critical relations                |
+| Prolog          | All production-critical rules     |
+| Explainability  | All recommendation pathways       |
+| Security        | Critical attack surfaces          |
+| Clinical Safety | All identified safety constraints |
+| E2E             | Core clinical workflows           |
+
+The numerical coverage thresholds should be established during implementation rather than invented without empirical justification.
+
+---
+
+# 24.63 Test Evidence
+
+Testing must generate reproducible evidence.
+
+Evidence may include:
+
+* automated test reports;
+* API responses;
+* database verification results;
+* Prolog query results;
+* ontology validation reports;
+* knowledge regression reports;
+* screenshots;
+* performance measurements;
+* logs;
+* expert validation records.
+
+The final dissertation should retain sufficient evidence to support major claims made in Chapter 25.
+
+---
+
+# 24.64 Verification Matrix
+
+| Verification Area | Primary Evidence            |
+| ----------------- | --------------------------- |
+| Requirements      | Requirements-test matrix    |
+| Domain logic      | Unit-test results           |
+| Database          | Migration/integration tests |
+| API               | Contract tests              |
+| Frontend          | Component/E2E tests         |
+| Ontology          | Ontology validation report  |
+| Knowledge Graph   | Integrity tests             |
+| Prolog            | Rule test suite             |
+| Explainability    | Explanation fidelity tests  |
+| Security          | Security test results       |
+| Deployment        | Smoke/readiness tests       |
+| Recovery          | Restoration test            |
+| Performance       | Benchmark/load results      |
+
+---
+
+# 24.65 Validation Matrix
+
+| Validation Area          | Method                        |
+| ------------------------ | ----------------------------- |
+| Clinical appropriateness | Expert review                 |
+| Safety                   | Safety test scenarios         |
+| Recommendation relevance | Representative cases          |
+| Explainability           | Explanation review            |
+| Semantic consistency     | Ontology/knowledge validation |
+| Usability                | User acceptance testing       |
+| Reliability              | Failure testing               |
+| Performance              | Controlled benchmarks         |
+
+---
+
+# 24.66 End-to-End Validation Scenario
+
+A complete representative scenario should demonstrate:
+
+```text
+User Authentication
+       │
+       ▼
+Patient Profile
+       │
+       ▼
+Nutrition Assessment
+       │
+       ▼
+Domain Validation
+       │
+       ▼
+Persistence
+       │
+       ▼
+Assessment Facts
+       │
+       ▼
+Ontology Mapping
+       │
+       ▼
+Knowledge Graph / Knowledge Retrieval
+       │
+       ▼
+Prolog Inference
+       │
+       ▼
+Clinical Constraints
+       │
+       ▼
+Recommendation
+       │
+       ▼
+ExplanationSession
+       │
+       ▼
+Persistence
+       │
+       ▼
+REST API
+       │
+       ▼
+React Interface
+```
+
+This scenario provides the strongest single demonstration that the architectural layers operate as an integrated system.
+
+---
+
+# 24.67 Failure-Path Testing
+
+The same scenario must be tested under failure conditions.
+
+### Prolog Failure
+
+```text
+Assessment
+   ↓
+Inference unavailable
+   ↓
+No successful clinical recommendation
+   ↓
+Controlled error
+```
+
+### Database Failure
+
+```text
+Assessment
+   ↓
+Persistence failure
+   ↓
+Transaction failure
+   ↓
+Controlled response
+```
+
+### Knowledge Failure
+
+```text
+Inference
+   ↓
+Knowledge validation failure
+   ↓
+Inference blocked
+```
+
+### Explanation Failure
+
+```text
+Recommendation
+   ↓
+Explanation unavailable
+   ↓
+Recommendation state handled according to safety policy
+```
+
+These tests verify that the system fails safely rather than merely failing technically.
+
+---
+
+# 24.68 Clinical Safety Test Invariants
+
+The following invariants should be treated as high-priority tests.
+
+### Invariant 1
+
+A contraindicated recommendation must not be presented as valid.
+
+### Invariant 2
+
+An inference failure must not be represented as successful inference.
+
+### Invariant 3
+
+Missing information must not automatically be interpreted as negative clinical evidence.
+
+### Invariant 4
+
+An explanation must not claim rules or evidence that were not part of the reasoning process.
+
+### Invariant 5
+
+A user must not access protected clinical data without authorization.
+
+### Invariant 6
+
+An invalid knowledge module must not become active production knowledge.
+
+### Invariant 7
+
+Historical clinical outputs must remain traceable to the relevant knowledge/rule version.
+
+These invariants provide a compact safety-oriented regression suite.
+
+---
+
+# 24.69 Testing Governance
+
+Testing itself is governed.
+
+Test artefacts should be:
+
+* version-controlled;
+* reproducible;
+* traceable;
+* reviewed;
+* associated with software and knowledge versions.
+
+Changes to critical test cases should be treated as controlled changes.
+
+A failing test should not simply be deleted because it prevents deployment.
+
+---
+
+# 24.70 Verification Exit Criteria
+
+A release may proceed to formal validation when:
+
+* critical automated tests pass;
+* mandatory integration tests pass;
+* critical security tests pass;
+* knowledge regression tests pass;
+* critical Prolog rules pass;
+* deployment smoke tests pass;
+* no unresolved critical defect exists.
+
+---
+
+# 24.71 Validation Exit Criteria
+
+A clinically relevant release may proceed toward acceptance when:
+
+* required verification is complete;
+* representative clinical scenarios have been validated;
+* safety constraints have passed;
+* explanations have been reviewed;
+* major validation defects are resolved;
+* knowledge provenance is confirmed;
+* results are reproducible.
+
+---
+
+# 24.72 Limitations of Testing
+
+Testing cannot prove that a clinical decision-support system is universally correct.
+
+A finite test suite cannot exhaustively cover:
+
+* every patient;
+* every disease;
+* every dietary pattern;
+* every interaction;
+* every future knowledge update.
+
+Therefore, testing establishes evidence of conformance and controlled behaviour within defined boundaries.
+
+It does not establish universal clinical correctness.
+
+This distinction is essential for a responsible clinical decision-support system.
+
+---
+
+# 24.73 Architecture Decision Record
+
+## ADR-024: Layered Verification and Validation Strategy
+
+### Status
+
+**Accepted**
+
+### Context
+
+NutriLogic combines conventional software components with semantic knowledge, symbolic reasoning, explainability, and clinical decision-support behaviour.
+
+Traditional unit testing alone cannot establish correctness across these layers.
+
+### Decision
+
+NutriLogic shall adopt a layered Testing, Verification, and Validation framework covering:
+
+* unit testing;
+* domain testing;
+* repository testing;
+* API testing;
+* frontend testing;
+* ontology validation;
+* knowledge-graph validation;
+* Prolog rule testing;
+* inference integration;
+* explanation fidelity;
+* security;
+* performance;
+* deployment;
+* clinical validation;
+* end-to-end workflows.
+
+Requirement traceability and controlled test evidence shall be maintained throughout development.
+
+### Rationale
+
+The strategy provides multiple independent forms of evidence and prevents successful software execution from being mistaken for clinical correctness.
+
+It also supports the architectural principle that every component must be independently testable while allowing complete clinical workflows to be validated at system level.
+
+### Consequences
+
+**Positive**
+
+* Stronger evidence of correctness.
+* Explicit clinical safety testing.
+* Reproducible regression testing.
+* Better traceability.
+* Safer knowledge evolution.
+* Clear separation between verification and evaluation.
+
+**Trade-offs**
+
+* Increased testing effort.
+* Clinical validation requires appropriate expertise.
+* Knowledge changes can trigger broad regression suites.
+* Maintaining representative test datasets requires governance.
+
+---
+
+# 24.74 Traceability Matrix
+
+| Architectural Area                        | Testing Strategy                   |
+| ----------------------------------------- | ---------------------------------- |
+| Chapter 5 Requirements                    | Requirement-test traceability      |
+| Chapter 7 Knowledge Engineering           | Knowledge validation               |
+| Chapter 8 Ontology                        | Ontology verification              |
+| Chapter 9 Knowledge Graph                 | Graph integrity testing            |
+| Chapter 10 NCP Engine                     | Workflow testing                   |
+| Chapter 11 Reasoning Engine               | Prolog rule testing                |
+| Chapter 12 Knowledge Base                 | Knowledge regression               |
+| Chapter 13 Ontology Implementation        | Semantic validation                |
+| Chapter 14 Knowledge Graph Implementation | Graph tests                        |
+| Chapter 15 Prolog Architecture            | Inference integration tests        |
+| Chapter 16 Governance/Safety              | Security and clinical safety tests |
+| Chapter 17 Integration                    | Integration/E2E tests              |
+| Chapter 19 Domain Architecture            | Domain/application tests           |
+| Chapter 20 Database                       | Repository/database tests          |
+| Chapter 21 REST API                       | API contract tests                 |
+| Chapter 22 Frontend                       | Component/E2E tests                |
+| Chapter 23 Deployment                     | Deployment/recovery tests          |
+| Chapter 24 Testing                        | V&V framework                      |
+| Chapter 25 Evaluation                     | Empirical system evaluation        |
+
+---
+
+# 24.75 Chapter Summary
+
+This chapter has established the Testing, Verification, and Validation Framework for NutriLogic.
+
+The framework recognizes that NutriLogic is not merely a web application. It is a knowledge-centric, neuro-symbolic Clinical Nutrition Decision Support System whose correctness depends on the interaction of software, semantic models, knowledge artefacts, symbolic rules, clinical constraints, and user-facing explanations.
+
+Testing has therefore been organized across multiple levels, from unit and domain tests through repository, API, frontend, ontology, knowledge-graph, Prolog, integration, security, performance, deployment, and end-to-end testing.
+
+Particular attention has been given to clinical safety. Contraindications, allergies, conflicting rules, missing information, inference failures, invalid knowledge, and explanation fidelity are treated as explicit test concerns rather than incidental edge cases.
+
+The chapter has also established requirement traceability, golden clinical cases, knowledge regression testing, test coverage dimensions, acceptance criteria, defect classification, CI quality gates, and controlled verification and validation evidence.
+
+Most importantly, the chapter establishes a clear boundary between **verification** and **evaluation**.
+
+Verification determines whether NutriLogic conforms to its specified architecture and requirements.
+
+Validation determines whether the implemented behaviour is appropriate for its intended decision-support purpose.
+
+Neither should be confused with the broader empirical evaluation of the research contribution.
+
+---
+
+# Chapter 25: System Evaluation and Empirical Assessment
+
+## 25.1 Introduction
+
+The preceding chapters established the architecture, implementation strategy, deployment model, and testing framework for NutriLogic.
+
+Chapter 24 established how the system is to be verified and validated. The purpose of this chapter is different.
+
+This chapter evaluates **how well the implemented system achieves the objectives for which it was designed**.
+
+The evaluation therefore moves beyond the question of whether individual components function correctly and examines the overall effectiveness of NutriLogic as a Clinical Nutrition Decision Support System.
+
+The general objective of the project is to design and implement a modular hybrid neuro-symbolic Clinical Nutrition Decision Support System capable of delivering personalized, explainable, and evidence-based nutrition recommendations for Kenya.
+
+The evaluation must consequently address whether the resulting system demonstrates:
+
+* structured nutrition assessment;
+* symbolic nutrition diagnosis;
+* individualized therapeutic interventions;
+* explainable recommendations;
+* modular representation of Kenyan nutrition knowledge;
+* personalization;
+* longitudinal monitoring;
+* transparency of inference;
+* extensibility;
+* and readiness for future neural integration.
+
+The evaluation also considers the non-functional objectives of maintainability, scalability, reliability, extensibility, security, and transparency. In particular, the system requires recommendations to remain traceable to explicit reasoning, while inference should be deterministic and reproducible for identical inputs.
+
+The evaluation is therefore designed as a **multi-dimensional empirical assessment** rather than a single accuracy measurement.
+
+---
+
+# 25.2 Evaluation Philosophy
+
+NutriLogic is an interdisciplinary system. Consequently, no single metric can adequately describe its performance.
+
+For example:
+
+* high software test coverage does not prove clinical appropriateness;
+* high recommendation accuracy does not prove explainability;
+* low inference latency does not prove knowledge correctness;
+* high usability does not prove symbolic reasoning correctness;
+* successful API requests do not demonstrate achievement of the research objectives.
+
+The evaluation therefore adopts the following model:
+
+```text
+                         SYSTEM EVALUATION
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+        ▼                       ▼                       ▼
+ Functional               Technical               Clinical /
+ Evaluation               Evaluation              Knowledge Evaluation
+        │                       │                       │
+        ├── Requirements        ├── Performance         ├── Reasoning
+        ├── Workflows           ├── Reliability         ├── Recommendations
+        ├── API                 ├── Scalability         ├── Safety
+        └── Features            └── Security            └── Explainability
+                                │
+                                ▼
+                       Research Objective
+                           Evaluation
+```
+
+This structure allows technical performance and research contribution to be evaluated independently before being synthesized.
+
+---
+
+# 25.3 Evaluation Objectives
+
+The evaluation aims to:
+
+1. Determine the degree to which the functional requirements have been achieved.
+2. Determine the degree to which non-functional requirements have been achieved.
+3. Evaluate the correctness of nutrition assessment workflows.
+4. Evaluate symbolic nutrition diagnosis.
+5. Evaluate recommendation generation.
+6. Evaluate personalization.
+7. Evaluate explainability and reasoning traceability.
+8. Evaluate knowledge representation and modularity.
+9. Evaluate clinical safety mechanisms.
+10. Measure inference performance.
+11. Evaluate system reliability.
+12. Evaluate API and application performance.
+13. Evaluate usability of the implemented workflows.
+14. Evaluate maintainability and extensibility characteristics.
+15. Assess readiness for future neuro-symbolic and machine-learning extensions.
+16. Answer the research questions established in Chapter 4.
+17. Determine whether the stated project success criteria have been achieved.
+18. Identify limitations and threats to validity.
+
+---
+
+# 25.4 Evaluation Questions
+
+The evaluation is organized around the following questions.
+
+### EQ1 — Functional Achievement
+
+To what extent does NutriLogic implement the specified functional requirements?
+
+### EQ2 — Clinical Reasoning
+
+To what extent does the system correctly transform structured nutrition assessments into nutrition diagnoses and appropriate interventions?
+
+### EQ3 — Explainability
+
+To what extent can generated recommendations be traced to explicit rules, evidence, and knowledge sources?
+
+### EQ4 — Personalization
+
+To what extent do patient-specific demographic, clinical, behavioural, and environmental factors influence recommendations?
+
+### EQ5 — Knowledge Engineering
+
+To what extent does the modular knowledge architecture support representation, maintenance, versioning, and reuse of nutrition knowledge?
+
+### EQ6 — Technical Performance
+
+How efficiently and reliably does the system execute its clinical decision-support workflow?
+
+### EQ7 — Usability
+
+Can intended users successfully complete the principal nutrition-care workflows?
+
+### EQ8 — Research Contribution
+
+To what extent does the implemented architecture address the research gap identified in Chapter 4?
+
+---
+
+# 25.5 Evaluation Dimensions
+
+The complete evaluation is divided into eight dimensions.
+
+| Dimension      | Primary Question                                            |
+| -------------- | ----------------------------------------------------------- |
+| Functional     | Does the system implement required functionality?           |
+| Clinical       | Are decision-support outputs appropriate?                   |
+| Knowledge      | Is nutrition knowledge represented correctly and modularly? |
+| Explainability | Can recommendations be traced and understood?               |
+| Technical      | Does the platform perform reliably and efficiently?         |
+| Usability      | Can users successfully operate the system?                  |
+| Security       | Are protected clinical resources appropriately controlled?  |
+| Research       | Does the system address the stated research objectives?     |
+
+This multidimensional structure prevents the evaluation from collapsing the entire research contribution into a single numerical score.
+
+---
+
+# 25.6 Evaluation Dataset
+
+The empirical evaluation shall use a controlled evaluation dataset.
+
+Where real patient data is unavailable or inappropriate for the study, synthetic or appropriately anonymized cases shall be used.
+
+Each case should contain, where relevant:
+
+```text
+Patient Characteristics
+        +
+Clinical Information
+        +
+Anthropometric Data
+        +
+Dietary Information
+        +
+Lifestyle Information
+        +
+Relevant Medical Conditions
+        +
+Allergy / Contraindication Information
+        │
+        ▼
+Expected Clinical Reasoning Outcome
+```
+
+The dataset should contain both ordinary and challenging cases.
+
+---
+
+# 25.7 Evaluation Case Categories
+
+The evaluation dataset should include representative categories such as:
+
+### Category A — General Nutrition
+
+Cases involving ordinary nutrition assessment and recommendations.
+
+### Category B — Nutrition Risk
+
+Cases involving identifiable nutrition-related risks.
+
+### Category C — Disease-Specific Nutrition
+
+Cases requiring disease-specific reasoning.
+
+### Category D — Therapeutic Intervention
+
+Cases requiring individualized intervention selection.
+
+### Category E — Contraindication
+
+Cases containing conditions that should restrict recommendations.
+
+### Category F — Allergy
+
+Cases containing relevant food or ingredient allergies.
+
+### Category G — Incomplete Data
+
+Cases where required information is missing.
+
+### Category H — Conflicting Evidence
+
+Cases containing potentially conflicting clinical observations.
+
+### Category I — Longitudinal Cases
+
+Cases containing multiple assessments over time.
+
+### Category J — Boundary Cases
+
+Cases near clinical decision thresholds.
+
+The final composition of the dataset should be reported explicitly rather than chosen retrospectively to produce favourable results.
+
+---
+
+# 25.8 Dataset Governance
+
+The evaluation dataset shall be version-controlled.
+
+Each dataset version should record:
+
+* dataset identifier;
+* creation date;
+* source;
+* case-generation method;
+* knowledge-base version;
+* ontology version;
+* rule version;
+* expected outputs;
+* validation status.
+
+This is necessary because changes to the knowledge base may legitimately change system outputs.
+
+---
+
+# 25.9 Evaluation Protocol
+
+Each evaluation case follows the same basic protocol.
+
+```text
+Evaluation Case
+      │
+      ▼
+Load Controlled Patient State
+      │
+      ▼
+Submit Nutrition Assessment
+      │
+      ▼
+Validate Assessment
+      │
+      ▼
+Execute Clinical Decision Pipeline
+      │
+      ▼
+Record Diagnosis
+      │
+      ▼
+Record Recommendations
+      │
+      ▼
+Record Explanation
+      │
+      ▼
+Compare Against Reference
+      │
+      ▼
+Calculate Evaluation Metrics
+```
+
+The evaluation environment should remain controlled throughout the experiment.
+
+---
+
+# 25.10 Functional Evaluation
+
+Functional evaluation measures whether NutriLogic provides the capabilities defined in Chapter 4.
+
+The specified functional objectives include:
+
+* registration and authentication;
+* profile management;
+* nutrition assessment;
+* nutrition diagnosis;
+* disease-specific reasoning;
+* meal planning;
+* therapeutic diet generation;
+* physical activity recommendations;
+* behaviour-change guidance;
+* progress monitoring;
+* recommendation history;
+* clinical explanations;
+* administrative knowledge management.
+
+Each capability shall be evaluated using corresponding test scenarios.
+
+---
+
+# 25.11 Functional Requirement Achievement Score
+
+A simple requirement achievement measure may be calculated as:
+
+[
+FAR = \frac{N_{satisfied}}{N_{evaluated}}\times100
+]
+
+where:
+
+* (N_{satisfied}) = number of evaluated requirements satisfying their acceptance criteria;
+* (N_{evaluated}) = total number of evaluated requirements.
+
+This metric should be reported alongside the individual requirement results.
+
+A high aggregate value must not conceal failure of a critical requirement.
+
+---
+
+# 25.12 Requirement Evaluation Matrix
+
+| Requirement                | Evaluation Method               | Evidence                |
+| -------------------------- | ------------------------------- | ----------------------- |
+| User registration          | Workflow test                   | Test result             |
+| Authentication             | Security/workflow test          | Authentication evidence |
+| Profile management         | Functional test                 | Profile output          |
+| Nutrition assessment       | Clinical workflow               | Assessment result       |
+| Nutrition diagnosis        | Reference-case comparison       | Diagnosis result        |
+| Therapeutic recommendation | Clinical evaluation             | Recommendation result   |
+| Explainability             | Trace inspection                | Explanation evidence    |
+| Monitoring                 | Longitudinal workflow           | Monitoring record       |
+| Knowledge management       | Administrative workflow         | Knowledge artefact      |
+| REST API                   | Contract/performance evaluation | API report              |
+
+The final dissertation should populate the table with actual results.
+
+---
+
+# 25.13 Nutrition Assessment Evaluation
+
+The assessment engine is evaluated for:
+
+* completeness;
+* validation correctness;
+* calculation correctness;
+* data consistency;
+* domain constraint enforcement;
+* handling of missing values;
+* semantic mapping.
+
+For each case:
+
+[
+Assessment\ Accuracy =
+\frac{Correctly\ interpreted\ observations}
+{Total\ evaluated\ observations}
+]
+
+Where appropriate, exact calculations should be compared against independently computed reference values.
+
+---
+
+# 25.14 Nutrition Diagnosis Evaluation
+
+Nutrition diagnosis is evaluated by comparing system-generated conclusions with validated reference outcomes.
+
+For a classification problem, conventional metrics may include:
+
+[
+Precision = \frac{TP}{TP+FP}
+]
+
+[
+Recall = \frac{TP}{TP+FN}
+]
+
+[
+F1 = 2\frac{Precision \times Recall}
+{Precision + Recall}
+]
+
+where:
+
+* (TP) = true positives;
+* (FP) = false positives;
+* (FN) = false negatives.
+
+However, these metrics should only be used where the diagnostic task is appropriately represented as a classification problem.
+
+For rule-based reasoning, case-level agreement with expert-validated reference conclusions may be more informative than generic classification metrics.
+
+---
+
+# 25.15 Recommendation Evaluation
+
+Recommendation evaluation examines whether generated interventions are:
+
+1. appropriate to the identified nutrition diagnosis;
+2. consistent with the patient's constraints;
+3. supported by the knowledge base;
+4. free from identified contraindications;
+5. sufficiently personalized;
+6. traceable to explicit reasoning.
+
+A recommendation should not be considered correct merely because it is nutritionally plausible.
+
+It must also be justified by the system's knowledge and decision pathway.
+
+---
+
+# 25.16 Recommendation Appropriateness
+
+For each evaluated recommendation, an expert or validated reference framework may classify the output as:
+
+* Appropriate;
+* Partially appropriate;
+* Inappropriate;
+* Unsafe;
+* Not applicable.
+
+The resulting distribution can be reported.
+
+A particularly important metric is:
+
+[
+Safety\ Rate =
+\frac{N_{recommendations\ without\ identified\ safety\ violation}}
+{N_{evaluated\ recommendations}}
+\times100
+]
+
+The definition of a safety violation must be established before evaluation.
+
+---
+
+# 25.17 Contraindication Evaluation
+
+Contraindication cases evaluate whether the system correctly suppresses prohibited recommendations.
+
+The key measure is:
+
+[
+Contraindication\ Detection\ Rate =
+\frac{Correctly\ rejected\ contraindicated\ recommendations}
+{Total\ contraindicated\ cases}
+\times100
+]
+
+False acceptance of a contraindicated intervention should be treated as a high-severity outcome rather than merely another classification error.
+
+---
+
+# 25.18 Allergy-Safety Evaluation
+
+Allergy cases shall evaluate whether the recommendation engine respects known allergy information.
+
+The critical metric is:
+
+[
+Allergy\ Safety\ Rate =
+\frac{Cases\ with\ no\ prohibited\ allergen\ recommendation}
+{Total\ allergy\ cases}
+\times100
+]
+
+The target should be established as a safety requirement rather than chosen after observing the results.
+
+---
+
+# 25.19 Personalization Evaluation
+
+The system is explicitly intended to personalize recommendations using demographic, clinical, behavioural, and environmental information.
+
+Personalization can be evaluated using paired cases.
+
+For example:
+
+```text
+Case A
+Same clinical condition
+Different demographic context
+
+             ↓
+
+Different relevant contextual information
+
+             ↓
+
+Expected recommendation adaptation
+```
+
+The purpose is not to force different recommendations for every different patient.
+
+Instead, the evaluation asks whether **relevant patient differences produce appropriate changes when those differences should affect the reasoning process**.
+
+---
+
+# 25.20 Explainability Evaluation
+
+Explainability is a central research objective.
+
+The system is intended to preserve transparency throughout inference, while every recommendation should remain traceable to explicit reasoning.
+
+Evaluation shall therefore examine whether each recommendation exposes:
+
+* relevant patient evidence;
+* activated rules;
+* intermediate conclusions;
+* knowledge sources;
+* final reasoning outcome.
+
+---
+
+# 25.21 Explanation Completeness
+
+An explanation can be evaluated against a predefined explanation schema.
+
+For example:
+
+| Explanation Element    | Present |
+| ---------------------- | ------- |
+| Input evidence         | Yes/No  |
+| Applied rule           | Yes/No  |
+| Intermediate inference | Yes/No  |
+| Knowledge source       | Yes/No  |
+| Final conclusion       | Yes/No  |
+| Recommendation         | Yes/No  |
+
+A completeness score may be calculated as:
+
+[
+EC =
+\frac{Explanation\ elements\ present}
+{Required\ explanation\ elements}
+\times100
+]
+
+This metric measures structural completeness, not human understanding.
+
+---
+
+# 25.22 Explanation Fidelity
+
+Explanation fidelity is more important than explanation length.
+
+For each explanation:
+
+[
+EF =
+\frac{Correctly\ represented\ reasoning\ elements}
+{Total\ evaluated\ reasoning\ elements}
+\times100
+]
+
+The evaluation should verify that:
+
+* cited rules were actually executed;
+* cited evidence was actually used;
+* conclusions follow from the recorded reasoning;
+* knowledge sources correspond to the active knowledge version.
+
+An attractive explanation that does not accurately represent the underlying reasoning should be considered a failure.
+
+---
+
+# 25.23 Explanation Understandability
+
+Where appropriate, intended users may evaluate explanations using structured questionnaires.
+
+Possible dimensions include:
+
+* clarity;
+* usefulness;
+* perceived transparency;
+* ease of understanding;
+* confidence in tracing the recommendation.
+
+The instrument used and its scoring methodology must be reported explicitly.
+
+No unsupported claim should be made that users "understood" an explanation without actually measuring understanding.
+
+---
+
+# 25.24 Knowledge Representation Evaluation
+
+The knowledge engineering architecture is evaluated against the objective of representing Kenyan nutrition knowledge as modular symbolic knowledge suitable for automated inference.
+
+RQ2 specifically asks how Kenyan nutrition guidelines can be represented as modular symbolic knowledge for automated inference.
+
+Evaluation therefore considers:
+
+* concept coverage;
+* relationship coverage;
+* rule coverage;
+* modularity;
+* provenance;
+* versioning;
+* consistency;
+* inference usability.
+
+---
+
+# 25.25 Knowledge Coverage
+
+Knowledge coverage can be reported as:
+
+[
+KC =
+\frac{N_{represented\ required\ concepts}}
+{N_{required\ concepts}}
+\times100
+]
+
+This requires an independently defined set of required concepts.
+
+The denominator must therefore be established before interpreting the result.
+
+---
+
+# 25.26 Rule Coverage
+
+Rule coverage measures the proportion of production rules exercised by the evaluation cases.
+
+[
+RC =
+\frac{N_{rules\ exercised}}
+{N_{production\ rules}}
+\times100
+]
+
+This should be supplemented with scenario coverage because a rule may execute without adequately representing the breadth of its clinical context.
+
+---
+
+# 25.27 Knowledge Modularity Evaluation
+
+The architecture defines modular knowledge as a major design goal.
+
+Evaluation should examine whether new knowledge can be introduced without modifying unrelated modules.
+
+A controlled change experiment may be performed:
+
+```text
+Existing Knowledge Base
+        │
+        ▼
+Add New Knowledge Module
+        │
+        ▼
+Regression Testing
+        │
+        ▼
+Existing Modules Remain Functional
+```
+
+The evaluation should record:
+
+* number of existing modules modified;
+* number of new artefacts introduced;
+* regression failures;
+* implementation effort;
+* dependency changes.
+
+This provides empirical evidence for the maintainability claim.
+
+---
+
+# 25.28 Maintainability Evaluation
+
+Maintainability should not be claimed solely from architectural diagrams.
+
+Possible evidence includes:
+
+* modularity;
+* dependency structure;
+* code complexity;
+* testability;
+* change impact;
+* knowledge-module isolation.
+
+Where appropriate, software metrics such as cyclomatic complexity or maintainability indices may be reported, but they should be treated as supporting indicators rather than direct measurements of maintainability.
+
+---
+
+# 25.29 Extensibility Evaluation
+
+The architecture is intended to support future diseases, foods, guidelines, and clinical modules without major redesign.
+
+Extensibility may therefore be evaluated through controlled extension exercises.
+
+Example:
+
+```text
+Existing System
+      │
+      ▼
+Introduce New Disease Module
+      │
+      ▼
+Introduce Associated Rules
+      │
+      ▼
+Add Required Knowledge
+      │
+      ▼
+Run Regression Suite
+      │
+      ▼
+Measure Architectural Impact
+```
+
+The evaluation should report the actual changes required.
+
+---
+
+# 25.30 Reliability Evaluation
+
+The architecture requires deterministic and reproducible inference for identical inputs.
+
+A reproducibility experiment should execute identical cases repeatedly.
+
+For deterministic inference:
+
+[
+O_1 = O_2 = \cdots = O_n
+]
+
+where (O_i) is the output from execution (i).
+
+Any unexplained divergence should be investigated.
+
+---
+
+# 25.31 Inference Performance Evaluation
+
+Inference performance shall measure:
+
+* mean latency;
+* median latency;
+* percentile latency;
+* throughput;
+* failure rate;
+* resource consumption.
+
+Mean latency alone can conceal outliers.
+
+Therefore, where sufficient observations exist, latency should be reported using:
+
+* mean;
+* median;
+* 95th percentile;
+* 99th percentile.
+
+---
+
+# 25.32 API Performance Evaluation
+
+API evaluation should measure:
+
+[
+Latency_{API}
+]
+
+[
+Throughput =
+\frac{Successful\ Requests}{Time}
+]
+
+and:
+
+[
+Error\ Rate =
+\frac{Failed\ Requests}
+{Total\ Requests}
+\times100
+]
+
+Measurements should distinguish between:
+
+* simple CRUD requests;
+* assessment submission;
+* inference requests;
+* explanation retrieval;
+* knowledge-management operations.
+
+---
+
+# 25.33 Scalability Evaluation
+
+Scalability is evaluated by observing system behaviour as workload increases.
+
+A controlled experiment may vary:
+
+```text
+Concurrent Users
+       │
+       ▼
+10 → 25 → 50 → 100 → ...
+```
+
+For each load level, measure:
+
+* latency;
+* throughput;
+* error rate;
+* CPU utilization;
+* memory utilization;
+* database load;
+* inference resource utilization.
+
+The actual load levels must reflect the available test infrastructure and intended deployment assumptions.
+
+---
+
+# 25.34 Reliability Under Failure
+
+Failure scenarios from Chapter 24 should be interpreted at evaluation level.
+
+Relevant measures include:
+
+* successful recovery rate;
+* failed-request rate;
+* recovery time;
+* data integrity after recovery;
+* safe failure behaviour.
+
+A system that remains technically available while producing unsafe clinical output should not be considered reliable.
+
+---
+
+# 25.35 Security Evaluation
+
+Security evaluation should determine whether the implemented security architecture satisfies its stated objectives.
+
+Evaluation should include:
+
+* authentication;
+* authorization;
+* access control;
+* protected patient data;
+* secure communication;
+* input handling;
+* administrative privileges.
+
+Security testing results should be reported separately from functional performance.
+
+---
+
+# 25.36 Usability Evaluation
+
+Usability evaluation examines whether intended users can successfully complete the major workflows.
+
+Candidate tasks include:
+
+1. Authenticate.
+2. Access a patient profile.
+3. Complete an assessment.
+4. Submit the assessment.
+5. Review a diagnosis.
+6. Review recommendations.
+7. Inspect an explanation.
+8. Review monitoring information.
+
+Possible usability measures include:
+
+* task completion rate;
+* task completion time;
+* error count;
+* user satisfaction;
+* perceived ease of use.
+
+The selected measurement instrument must be identified in the final empirical study.
+
+---
+
+# 25.37 Overall System Quality
+
+An overall quality score should **not** simply average unrelated metrics.
+
+For example:
+
+```text
+Accuracy = 95%
+Latency = 100 ms
+Usability = 90%
+```
+
+does not logically imply:
+
+```text
+Overall Quality = 95%
+```
+
+Different dimensions represent different properties.
+
+Therefore, NutriLogic shall report a **multi-dimensional evaluation profile** rather than hiding important differences inside a single arbitrary composite score.
+
+---
+
+# 25.38 Evaluation of Research Question RQ1
+
+### RQ1
+
+> How can symbolic reasoning be used to produce explainable personalized nutrition recommendations for Kenyan populations?
+
+The evaluation addresses RQ1 through:
+
+* assessment-to-fact transformation;
+* symbolic inference;
+* personalized recommendation generation;
+* explanation trace generation;
+* clinical-case evaluation.
+
+Evidence should demonstrate whether patient-specific inputs influence symbolic reasoning and whether the resulting recommendation can be traced to explicit rules and knowledge.
+
+---
+
+# 25.39 Evaluation of Research Question RQ2
+
+### RQ2
+
+> How can Kenyan nutrition guidelines be represented as modular symbolic knowledge suitable for automated inference?
+
+RQ2 is evaluated through:
+
+* ontology coverage;
+* knowledge-module structure;
+* rule coverage;
+* provenance;
+* knowledge-versioning;
+* automated inference;
+* controlled knowledge-extension experiments.
+
+The evaluation should demonstrate not only that knowledge can be represented, but that the representation is usable by the reasoning engine.
+
+---
+
+# 25.40 Evaluation of Research Question RQ3
+
+### RQ3
+
+> How can structured clinical nutrition reasoning be modelled computationally using the Nutrition Care Process?
+
+RQ3 is evaluated by tracing the implemented workflow:
+
+```text
+Assessment
+    ↓
+Diagnosis
+    ↓
+Intervention
+    ↓
+Monitoring
+```
+
+The evaluation should determine whether the implemented workflow preserves the intended sequence and relationships of the Nutrition Care Process.
+
+---
+
+# 25.41 Evaluation of Research Question RQ4
+
+### RQ4
+
+> How can neural prediction models complement symbolic reasoning without compromising explainability?
+
+This question requires an important distinction.
+
+If neural components have not been implemented and empirically evaluated, RQ4 cannot honestly be claimed as experimentally answered.
+
+The current architecture establishes **readiness for future neural integration**. The evaluation should therefore assess:
+
+* architectural extensibility;
+* interface boundaries;
+* separation between predictive and symbolic components;
+* preservation of symbolic reasoning authority.
+
+A full empirical answer to RQ4 requires implementation and evaluation of an actual neural component.
+
+This distinction prevents the dissertation from overstating its contribution.
+
+---
+
+# 25.42 Evaluation of Research Question RQ5
+
+### RQ5
+
+> How can modular knowledge engineering simplify long-term maintenance of nutrition expert systems?
+
+RQ5 can be evaluated through controlled knowledge-maintenance experiments.
+
+For example:
+
+```text
+Baseline Knowledge Base
+        │
+        ▼
+Introduce Knowledge Change
+        │
+        ▼
+Measure:
+- files/modules changed
+- dependencies affected
+- regression failures
+- implementation effort
+        │
+        ▼
+Compare with baseline architecture
+```
+
+This provides stronger evidence than simply asserting that modularization improves maintainability.
+
+---
+
+# 25.43 Evaluation Against Success Criteria
+
+Chapter 4 established the following success criteria:
+
+* modular knowledge organisation;
+* comprehensive nutrition assessment;
+* nutrition diagnosis before recommendation;
+* explainable inference chains;
+* personalized recommendations;
+* disease-specific therapeutic reasoning;
+* longitudinal monitoring;
+* extensible architecture;
+* machine-learning integration readiness;
+* compliance with Kenyan nutrition guidance.
+
+The final evaluation should explicitly classify each criterion.
+
+| Success Criterion               | Evidence                           | Status           |
+| ------------------------------- | ---------------------------------- | ---------------- |
+| Modular knowledge organisation  | Module structure/change experiment | To be determined |
+| Comprehensive assessment        | Assessment evaluation              | To be determined |
+| Diagnosis before recommendation | Workflow trace                     | To be determined |
+| Explainable inference           | Explanation evaluation             | To be determined |
+| Personalization                 | Paired-case evaluation             | To be determined |
+| Disease-specific reasoning      | Clinical cases                     | To be determined |
+| Longitudinal monitoring         | Monitoring workflow                | To be determined |
+| Extensible architecture         | Extension experiment               | To be determined |
+| ML integration readiness        | Architecture evaluation            | To be determined |
+| Kenyan guideline alignment      | Knowledge/provenance review        | To be determined |
+
+The status column should only be populated after evidence has been collected.
+
+---
+
+# 25.44 Research Objective Achievement Matrix
+
+| Objective                    | Evaluation Evidence     | Outcome         |
+| ---------------------------- | ----------------------- | --------------- |
+| Nutrition assessment engine  | Assessment cases        | To be evaluated |
+| Symbolic diagnosis           | Diagnosis cases         | To be evaluated |
+| Therapeutic interventions    | Recommendation cases    | To be evaluated |
+| Explainable recommendations  | Explanation analysis    | To be evaluated |
+| Modular Kenyan knowledge     | Knowledge analysis      | To be evaluated |
+| Personalized recommendations | Paired-case analysis    | To be evaluated |
+| Longitudinal monitoring      | Longitudinal workflow   | To be evaluated |
+| Neural integration readiness | Architecture assessment | To be evaluated |
+| Inference transparency       | Trace analysis          | To be evaluated |
+| Extensible architecture      | Extension experiment    | To be evaluated |
+
+This matrix directly connects empirical evidence to the specific objectives established in Chapter 4.
+
+---
+
+# 25.45 Comparative Evaluation
+
+Where suitable baseline systems or alternative approaches are available, NutriLogic may be compared against them.
+
+Possible comparison dimensions include:
+
+* explainability;
+* personalization;
+* knowledge traceability;
+* clinical constraint handling;
+* inference determinism;
+* modularity;
+* response time.
+
+However, comparison should only be performed where the baseline is genuinely comparable.
+
+A weak or artificially selected baseline would produce a misleading evaluation.
+
+---
+
+# 25.46 Baseline Strategy
+
+Potential baselines may include:
+
+### Baseline A — Rule-Limited Prototype
+
+The earlier simpler implementation of NutriLogic.
+
+### Baseline B — Non-Explainable Recommendation Approach
+
+A conventional recommendation mechanism without explicit reasoning traces.
+
+### Baseline C — Static Guideline Lookup
+
+A system that retrieves guideline information without executing structured symbolic reasoning.
+
+The chosen baseline should be justified according to the research question rather than selected merely because NutriLogic performs better against it.
+
+---
+
+# 25.47 Statistical Analysis
+
+Where sufficient numerical observations exist, descriptive statistics should include:
+
+* mean;
+* median;
+* standard deviation;
+* minimum;
+* maximum;
+* relevant percentiles.
+
+For comparative experiments, appropriate statistical tests may be applied depending on:
+
+* sample size;
+* measurement scale;
+* distribution;
+* independence;
+* experimental design.
+
+Statistical significance should not be confused with practical or clinical significance.
+
+---
+
+# 25.48 Effect Interpretation
+
+An observed improvement should be interpreted in context.
+
+For example:
+
+```text
+System A: 92%
+System B: 95%
+```
+
+does not automatically establish that System B provides a meaningful clinical improvement.
+
+The interpretation should consider:
+
+* magnitude;
+* uncertainty;
+* case composition;
+* clinical significance;
+* safety implications;
+* practical deployment consequences.
+
+---
+
+# 25.49 Evaluation Reproducibility
+
+The evaluation must be reproducible.
+
+The following should therefore be recorded:
+
+* source-code version;
+* ontology version;
+* knowledge-base version;
+* rule version;
+* database schema version;
+* dataset version;
+* environment;
+* configuration;
+* evaluation scripts;
+* random seeds where applicable;
+* evaluation date.
+
+This is particularly important because the architecture explicitly requires reproducible inference and controlled knowledge evolution.
+
+---
+
+# 25.50 Evaluation Environment
+
+The evaluation environment should document:
+
+| Component        | Configuration                        |
+| ---------------- | ------------------------------------ |
+| Operating System | Recorded implementation environment  |
+| Backend          | Django version                       |
+| Python           | Python version                       |
+| Database         | PostgreSQL version                   |
+| Reasoning Engine | SWI-Prolog version                   |
+| Frontend         | React/Next.js version as implemented |
+| Browser          | Browser/version for UI testing       |
+| Hardware         | CPU/RAM/storage                      |
+| Network          | Test network characteristics         |
+
+Exact versions should be populated from the actual implementation environment rather than assumed.
+
+---
+
+# 25.51 Threats to Validity
+
+A rigorous evaluation must explicitly recognize its limitations.
+
+### Internal Validity
+
+Results may be influenced by:
+
+* test-case construction;
+* implementation bugs;
+* configuration;
+* dataset selection.
+
+### External Validity
+
+Results from controlled cases may not generalize to:
+
+* all Kenyan populations;
+* all clinical environments;
+* all nutrition conditions;
+* real-world patient variability.
+
+### Construct Validity
+
+Metrics such as explanation completeness may not fully capture human understanding.
+
+### Knowledge Validity
+
+The system can only reason from the quality and scope of the knowledge encoded into it.
+
+### Clinical Validity
+
+Software performance does not establish clinical efficacy or safety in real-world patient care.
+
+---
+
+# 25.52 Limitations of the Evaluation
+
+Several limitations should be acknowledged.
+
+First, a finite evaluation dataset cannot represent the complete diversity of nutrition cases.
+
+Second, expert-reviewed reference outcomes may themselves contain disagreement.
+
+Third, symbolic reasoning performance depends strongly on the completeness and correctness of the encoded knowledge.
+
+Fourth, architectural readiness for future machine-learning integration is not equivalent to empirical validation of a neural component.
+
+Fifth, usability results obtained from a small participant group may not generalize to the broader intended population.
+
+These limitations should be reported rather than hidden.
+
+---
+
+# 25.53 Evaluation Evidence Hierarchy
+
+Evidence should be interpreted according to its strength.
+
+```text
+Architecture Claim
+       │
+       ▼
+Implementation Evidence
+       │
+       ▼
+Automated Verification
+       │
+       ▼
+Controlled Evaluation
+       │
+       ▼
+Expert / User Validation
+       │
+       ▼
+Real-World Clinical Evidence
+```
+
+The current dissertation should not claim evidence at a higher level than the study actually provides.
+
+This is particularly important for a clinical decision-support system.
+
+---
+
+# 25.54 Evaluation Reporting Structure
+
+The final empirical results section should report each experiment using the following structure:
+
+1. Objective.
+2. Research question.
+3. Dataset.
+4. Experimental setup.
+5. Procedure.
+6. Metrics.
+7. Results.
+8. Interpretation.
+9. Limitations.
+
+This prevents the evaluation from becoming a collection of disconnected tables.
+
+---
+
+# 25.55 Proposed Results Table
+
+The final results chapter section can use a structure such as:
+
+| Metric                             |            Target | Observed | Interpretation |
+| ---------------------------------- | ----------------: | -------: | -------------- |
+| Functional requirement achievement | Defined threshold |      TBD | TBD            |
+| Diagnosis agreement                | Defined threshold |      TBD | TBD            |
+| Recommendation appropriateness     | Defined threshold |      TBD | TBD            |
+| Contraindication safety            | Defined threshold |      TBD | TBD            |
+| Allergy safety                     | Defined threshold |      TBD | TBD            |
+| Explanation completeness           | Defined threshold |      TBD | TBD            |
+| Explanation fidelity               | Defined threshold |      TBD | TBD            |
+| Inference latency                  | Defined threshold |      TBD | TBD            |
+| API latency                        | Defined threshold |      TBD | TBD            |
+| Error rate                         | Defined threshold |      TBD | TBD            |
+| Task completion                    | Defined threshold |      TBD | TBD            |
+
+Targets should be justified before the final results are interpreted.
+
+---
+
+# 25.56 Interpretation Framework
+
+The final evaluation should answer three questions for every major result:
+
+### What happened?
+
+Describe the observed result.
+
+### Why did it happen?
+
+Relate the result to architecture, knowledge, implementation, or experimental conditions.
+
+### Why does it matter?
+
+Explain its significance for the research objective.
+
+This prevents the dissertation from merely reporting numbers without interpreting them.
+
+---
+
+# 25.57 Evaluation-to-Architecture Traceability
+
+The evaluation directly corresponds to the architecture developed throughout the dissertation.
+
+```text
+Requirements
+     │
+     ▼
+Architecture
+     │
+     ▼
+Implementation
+     │
+     ▼
+Testing
+     │
+     ▼
+Evaluation
+     │
+     ▼
+Research Findings
+```
+
+Each architectural decision should therefore have corresponding evidence where a measurable claim is made.
+
+For example:
+
+| Architectural Claim     | Evaluation                       |
+| ----------------------- | -------------------------------- |
+| Modular knowledge       | Knowledge-extension experiment   |
+| Explainable reasoning   | Explanation fidelity             |
+| Deterministic inference | Repeated execution               |
+| Clinical safety         | Contraindication/allergy testing |
+| Extensibility           | Controlled extension             |
+| Scalability             | Load testing                     |
+| Secure architecture     | Security evaluation              |
+
+---
+
+# 25.58 Overall Evaluation Model
+
+The complete evaluation can be summarized as:
+
+```text
+                  NUTRILOGIC
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+        ▼             ▼             ▼
+   Functional      Technical      Clinical
+   Achievement     Quality        Effectiveness
+        │             │             │
+        └─────────────┼─────────────┘
+                      │
+                      ▼
+                Research Goals
+                      │
+                      ▼
+              Research Questions
+                      │
+                      ▼
+             Research Contribution
+```
+
+This model connects implementation evidence to the actual research contribution.
+
+---
+
+# 25.59 Chapter 25 Architecture Decision Record
+
+## ADR-025: Multi-Dimensional Empirical Evaluation
+
+### Status
+
+**Accepted**
+
+### Context
+
+NutriLogic combines software engineering, clinical nutrition, knowledge engineering, symbolic reasoning, explainability, and future neuro-symbolic integration.
+
+No single performance metric adequately represents the quality or research contribution of such a system.
+
+### Decision
+
+NutriLogic shall be evaluated using a multi-dimensional framework covering:
+
+* functional achievement;
+* clinical reasoning;
+* recommendation appropriateness;
+* safety;
+* explainability;
+* knowledge representation;
+* maintainability;
+* extensibility;
+* reliability;
+* performance;
+* scalability;
+* security;
+* usability;
+* and research objective achievement.
+
+### Rationale
+
+This approach aligns evaluation with the interdisciplinary nature of the system and prevents technical performance from being incorrectly interpreted as clinical effectiveness.
+
+It also directly reflects the project's stated success criteria, including modular knowledge organisation, nutrition diagnosis before recommendation, explainable inference, personalization, longitudinal monitoring, extensibility, machine-learning readiness, and Kenyan guideline alignment.
+
+### Consequences
+
+**Positive**
+
+* Stronger research evidence.
+* Direct traceability to objectives.
+* Clear separation of technical and clinical evaluation.
+* Better identification of limitations.
+* More defensible conclusions.
+
+**Trade-offs**
+
+* Evaluation becomes more complex.
+* Multiple datasets and experiments may be required.
+* Some dimensions require expert or user participants.
+* Results cannot be reduced to a single simplistic performance number.
+
+---
+
+# 25.60 Traceability Matrix
+
+| Research Element  | Evaluation Method                                  | Evidence                                     |
+| ----------------- | -------------------------------------------------- | -------------------------------------------- |
+| General Objective | Integrated system evaluation                       | Overall evaluation                           |
+| RQ1               | Symbolic reasoning + explanation + personalization | Clinical cases                               |
+| RQ2               | Knowledge representation evaluation                | Ontology/rule/knowledge analysis             |
+| RQ3               | NCP workflow evaluation                            | Assessment-diagnosis-intervention-monitoring |
+| RQ4               | Architecture readiness assessment                  | Integration architecture                     |
+| RQ5               | Knowledge maintenance experiment                   | Change-impact evidence                       |
+| FRs               | Functional evaluation                              | Requirement matrix                           |
+| NFRs              | Technical evaluation                               | Performance/security/reliability             |
+| Explainability    | Fidelity/completeness                              | Explanation analysis                         |
+| Safety            | Contraindication/allergy evaluation                | Safety results                               |
+| Extensibility     | Controlled extension                               | Change-impact results                        |
+| Maintainability   | Structural/change analysis                         | Architecture evidence                        |
+
+---
+
+# 25.61 Chapter Summary
+
+This chapter has established the empirical evaluation framework for NutriLogic.
+
+Unlike Chapter 24, which established verification and validation procedures, Chapter 25 evaluates the extent to which the completed system achieves its intended functional, technical, clinical, and research objectives.
+
+The evaluation is deliberately multidimensional.
+
+Functional evaluation determines whether the required system capabilities have been implemented.
+
+Clinical evaluation examines assessment, diagnosis, intervention, personalization, contraindication handling, allergy safety, and recommendation appropriateness.
+
+Knowledge evaluation examines the representation, modularity, provenance, coverage, and maintainability of the nutrition knowledge base.
+
+Explainability evaluation examines whether recommendations can be faithfully traced to explicit evidence, rules, intermediate conclusions, and knowledge sources.
+
+Technical evaluation examines reliability, inference performance, API performance, scalability, security, and usability.
+
+Finally, the evaluation maps these results back to the five research questions and the project's specific objectives.
+
+A particularly important methodological boundary has been established for **RQ4**. The architecture provides readiness for future neural integration, but architectural readiness must not be presented as empirical evidence that a neural model has already been integrated or validated. A full experimental answer to that question requires an implemented neural component and corresponding evaluation.
+
+The chapter therefore provides a rigorous framework through which the actual experimental results can be reported without overstating the evidence.
+
+---
+
+# Chapter 26: Future Extension and Evolution Roadmap
+
+## 26.1 Introduction
+
+The preceding chapters have established, implemented, tested, and evaluated the NutriLogic Clinical Nutrition Decision Support System (CNDSS).
+
+The architecture was deliberately designed not only to support the current system but also to provide a foundation for future evolution.
+
+The original implementation roadmap identifies advanced capabilities including neuro-symbolic integration, machine-learning augmentation, predictive analytics, population dashboards, mobile integration, FHIR interoperability, and wearable-device integration. 
+
+This chapter therefore defines the future evolution of NutriLogic beyond the current dissertation implementation.
+
+The objective is not to introduce speculative features without architectural justification. Instead, each proposed extension is mapped to an existing architectural capability, its expected research or clinical value, its dependencies, and the governance considerations required before implementation.
+
+The future roadmap follows a central principle:
+
+> **Extend the system's intelligence without weakening the transparency, safety, governance, and determinism of its clinical reasoning core.**
+
+This principle is particularly important because NutriLogic is intended to evolve from a knowledge-based symbolic system into a hybrid neuro-symbolic platform rather than simply replacing symbolic reasoning with an opaque machine-learning model.
+
+---
+
+# 26.2 Evolution Objectives
+
+The future evolution of NutriLogic aims to:
+
+1. Introduce machine-learning capabilities while preserving symbolic explainability.
+2. Develop a formally integrated neuro-symbolic reasoning architecture.
+3. Improve personalization through predictive models.
+4. Introduce advanced predictive analytics.
+5. Expand interoperability with healthcare information systems.
+6. Support mobile and ubiquitous nutrition monitoring.
+7. Integrate wearable and sensor-derived data.
+8. Develop population-level nutrition intelligence.
+9. Automate selected aspects of knowledge acquisition.
+10. Establish controlled guideline-update pipelines.
+11. Improve clinical governance as system capability expands.
+12. Support larger-scale deployment.
+13. Provide a research platform for future clinical nutrition studies.
+
+---
+
+# 26.3 Evolution Philosophy
+
+The future architecture should not abandon the principles established in the current system.
+
+The following architectural invariants should therefore remain protected:
+
+```text
+                    FUTURE EXTENSIONS
+                           │
+             ┌─────────────┼─────────────┐
+             ▼             ▼             ▼
+        Neural Models   New Data      New Interfaces
+             │             │             │
+             └─────────────┼─────────────┘
+                           ▼
+                 Controlled Integration
+                           │
+                           ▼
+                 Symbolic Safety Layer
+                           │
+                           ▼
+                  Explainable Decision
+                           │
+                           ▼
+                    Clinical Output
+```
+
+The symbolic knowledge and governance layers should therefore remain authoritative for constraints, provenance, safety rules, and explanation.
+
+Machine-learning components should augment the system rather than silently bypassing these controls.
+
+---
+
+# 26.4 Current-State and Target-State Architecture
+
+The evolution can be represented as a transition from the current architecture:
+
+```text
+Current NutriLogic
+
+Patient
+   │
+   ▼
+Assessment
+   │
+   ▼
+Semantic Representation
+   │
+   ▼
+Knowledge Graph
+   │
+   ▼
+Prolog Reasoning
+   │
+   ▼
+Diagnosis
+   │
+   ▼
+Intervention
+   │
+   ▼
+Explanation
+```
+
+toward:
+
+```text
+Future NutriLogic
+
+Patient / Sensors / EHR / Mobile
+              │
+              ▼
+       Data Integration Layer
+              │
+      ┌───────┴────────┐
+      ▼                ▼
+Predictive Models   Symbolic Knowledge
+      │                │
+      └───────┬────────┘
+              ▼
+       Neuro-Symbolic
+       Decision Layer
+              │
+       ┌──────┴──────┐
+       ▼             ▼
+ Safety / Rules   Explanation
+       │             │
+       └──────┬──────┘
+              ▼
+      Clinical Decision
+          Support
+              │
+      ┌───────┼────────┐
+      ▼       ▼        ▼
+    Web     Mobile   Clinical
+                     Systems
+```
+
+The target architecture therefore expands the information available to the system while preserving the existing knowledge-centric reasoning foundation.
+
+---
+
+# 26.5 Evolution Roadmap
+
+The proposed evolution is organized into six major phases.
+
+| Phase   | Extension                  | Primary Outcome                      |
+| ------- | -------------------------- | ------------------------------------ |
+| Phase 1 | Platform hardening         | Production-ready symbolic CNDSS      |
+| Phase 2 | Predictive augmentation    | ML-assisted personalization          |
+| Phase 3 | Neuro-symbolic integration | Hybrid reasoning                     |
+| Phase 4 | Interoperability           | Connected clinical ecosystem         |
+| Phase 5 | Ubiquitous monitoring      | Continuous nutrition intelligence    |
+| Phase 6 | Population intelligence    | Population-level nutrition analytics |
+
+The phases are sequential in terms of architectural maturity, but implementation may overlap where dependencies permit.
+
+---
+
+# 26.6 Phase 1 — Platform Hardening
+
+Before introducing advanced intelligence, the existing symbolic platform should be strengthened.
+
+Priority areas include:
+
+* performance optimization;
+* security hardening;
+* automated deployment;
+* observability;
+* backup and disaster recovery;
+* knowledge-base versioning;
+* automated regression testing;
+* clinical safety testing;
+* audit infrastructure;
+* production monitoring.
+
+This phase is important because increasing system complexity before stabilizing the existing platform would create unnecessary technical debt.
+
+---
+
+# 26.7 Phase 2 — Machine-Learning Augmentation
+
+The next major extension is the introduction of machine-learning models.
+
+Potential applications include:
+
+* risk prediction;
+* dietary pattern classification;
+* recommendation ranking;
+* adherence prediction;
+* outcome prediction;
+* patient segmentation;
+* nutritional deficiency risk estimation.
+
+The ML subsystem should communicate with the application through explicit interfaces.
+
+```text
+Patient Data
+     │
+     ▼
+Feature Engineering
+     │
+     ▼
+Predictive Model
+     │
+     ▼
+Prediction / Score
+     │
+     ▼
+Symbolic Reasoning
+     │
+     ▼
+Validated Recommendation
+```
+
+The ML model should not directly generate an unconstrained clinical recommendation.
+
+Instead, its outputs should become evidence available to the symbolic reasoning process.
+
+---
+
+# 26.8 Predictive Risk Models
+
+Predictive models could estimate risks such as:
+
+* nutrition deterioration;
+* poor intervention adherence;
+* future nutrition-related complications;
+* likelihood of achieving behavioural goals;
+* likelihood of requiring follow-up.
+
+For example:
+
+[
+P(Risk \mid X)
+]
+
+where (X) represents the patient's available features.
+
+The resulting probability should be treated as a prediction rather than a clinical diagnosis.
+
+The symbolic layer can then apply rules determining how such predictions may influence decision support.
+
+---
+
+# 26.9 Recommendation Ranking
+
+A future recommendation-ranking model could estimate the relative usefulness of candidate interventions.
+
+```text
+Candidate Recommendations
+          │
+          ▼
+    Ranking Model
+          │
+          ▼
+ Ranked Candidates
+          │
+          ▼
+ Symbolic Constraints
+          │
+          ▼
+ Safe Recommendations
+```
+
+This architecture provides a useful separation.
+
+The neural model determines **which valid candidates appear most relevant**, while symbolic rules determine **which candidates are permissible**.
+
+---
+
+# 26.10 Learning from Longitudinal Outcomes
+
+The Monitoring Context established in the backend architecture creates an opportunity for future learning.
+
+Historical records may eventually contain:
+
+```text
+Assessment
+    ↓
+Diagnosis
+    ↓
+Intervention
+    ↓
+Patient Behaviour
+    ↓
+Follow-up
+    ↓
+Outcome
+```
+
+This sequence can provide training data for models predicting intervention effectiveness.
+
+However, outcome data must be governed carefully.
+
+A system should not automatically treat observed patient behaviour as proof that a recommendation was clinically effective.
+
+Confounding factors, adherence, concurrent treatment, socioeconomic conditions, and measurement error must be considered.
+
+---
+
+# 26.11 Phase 3 — Neuro-Symbolic Integration
+
+The long-term AI objective is to combine learned representations with symbolic reasoning.
+
+The proposed architecture is:
+
+```text
+                 Patient Data
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+    Neural Layer          Symbolic Layer
+          │                     │
+  Prediction / Pattern     Rules / Ontology
+     Recognition           / Knowledge Graph
+          │                     │
+          └──────────┬──────────┘
+                     ▼
+              Fusion Layer
+                     │
+                     ▼
+          Constraint Validation
+                     │
+                     ▼
+             Clinical Decision
+                     │
+                     ▼
+                Explanation
+```
+
+This architecture preserves the core principle of the dissertation: learned intelligence should be integrated with explicit knowledge rather than replacing it.
+
+---
+
+# 26.12 Neural-Symbolic Fusion Strategies
+
+Several strategies may be investigated.
+
+### Strategy A — Neural-to-Symbolic
+
+The neural model produces structured facts consumed by Prolog.
+
+```text
+Raw Data
+   ↓
+Neural Model
+   ↓
+Structured Facts
+   ↓
+Prolog
+```
+
+### Strategy B — Symbolic-to-Neural
+
+Symbolic knowledge is transformed into features or constraints supplied to the neural model.
+
+```text
+Knowledge Graph
+      ↓
+Feature / Constraint Extraction
+      ↓
+Neural Model
+```
+
+### Strategy C — Bidirectional Fusion
+
+The neural and symbolic components exchange structured information.
+
+```text
+Neural Model ⇄ Symbolic Reasoner
+```
+
+The third strategy offers the greatest research potential but also introduces substantially greater complexity.
+
+---
+
+# 26.13 Explainability Preservation
+
+Neural integration must not invalidate the explanation architecture.
+
+A future hybrid explanation should distinguish:
+
+1. **Observed evidence**
+2. **Model-derived prediction**
+3. **Symbolic inference**
+4. **Clinical constraint**
+5. **Final recommendation**
+
+For example:
+
+```text
+Observed Data
+     ↓
+ML Prediction
+     ↓
+Symbolic Rule Activation
+     ↓
+Constraint Validation
+     ↓
+Recommendation
+```
+
+This separation allows users to determine which parts of a decision came from learned statistical patterns and which came from explicit domain rules.
+
+---
+
+# 26.14 Uncertainty-Aware Reasoning
+
+Machine-learning predictions introduce uncertainty.
+
+Future versions should therefore represent uncertainty explicitly.
+
+For example:
+
+[
+Prediction = (class,\ probability)
+]
+
+rather than:
+
+[
+Prediction = class
+]
+
+A symbolic rule may then impose a threshold:
+
+[
+P(condition|X) \geq \tau
+]
+
+before allowing a prediction to influence a decision.
+
+The threshold (\tau) should be justified empirically and clinically rather than selected arbitrarily.
+
+---
+
+# 26.15 Human Oversight
+
+Increasing system intelligence should not eliminate human oversight.
+
+A future architecture should support:
+
+```text
+Automated Decision Support
+          │
+          ▼
+Confidence / Risk Assessment
+          │
+     ┌────┴────┐
+     ▼         ▼
+ Low Risk    High Risk
+     │         │
+     ▼         ▼
+ Automated   Human Review
+ Support
+```
+
+The precise boundaries between automated and human-reviewed decisions should be defined according to clinical risk.
+
+---
+
+# 26.16 Phase 4 — Healthcare Interoperability
+
+A major future capability is integration with external healthcare systems.
+
+The dissertation already identifies FHIR interoperability as a future advanced feature. 
+
+A future interoperability layer could support exchange of:
+
+* Patient;
+* Observation;
+* Condition;
+* AllergyIntolerance;
+* Medication;
+* CarePlan;
+* Goal;
+* NutritionOrder;
+* Encounter.
+
+The implementation should use standards-compliant mappings rather than custom point-to-point integrations wherever possible.
+
+---
+
+# 26.17 FHIR Integration Architecture
+
+A future integration pathway may follow:
+
+```text
+External EHR
+     │
+     ▼
+FHIR Interface
+     │
+     ▼
+Interoperability Adapter
+     │
+     ▼
+Canonical NutriLogic Model
+     │
+     ▼
+Clinical Decision Pipeline
+     │
+     ▼
+FHIR Response / Care Artefact
+```
+
+The canonical domain model should remain independent of the external representation.
+
+This preserves the Hexagonal Architecture principle established earlier.
+
+---
+
+# 26.18 Mobile Integration
+
+Mobile applications could provide patients with continuous access to:
+
+* nutrition plans;
+* dietary goals;
+* meal recommendations;
+* reminders;
+* progress tracking;
+* educational material;
+* follow-up assessments.
+
+The mobile application should consume the same governed APIs rather than introducing an independent clinical decision engine.
+
+```text
+Web ───────┐
+           │
+Mobile ────┼──→ NutriLogic API
+           │
+Clinical ──┘
+```
+
+This preserves a single source of truth for clinical decision logic.
+
+---
+
+# 26.19 Wearable and Sensor Integration
+
+Future versions could ingest information from wearable and connected devices.
+
+Potential inputs include:
+
+* physical activity;
+* heart rate;
+* sleep;
+* energy expenditure;
+* weight;
+* glucose measurements where available;
+* other validated physiological measurements.
+
+The system should distinguish between:
+
+**Directly observed data**
+
+and
+
+**Derived measurements**
+
+because they carry different reliability characteristics.
+
+Sensor data should also undergo validation before entering clinical reasoning.
+
+---
+
+# 26.20 Continuous Nutrition Monitoring
+
+Wearable integration could transform the system from episodic assessment toward longitudinal monitoring.
+
+Current:
+
+```text
+Assessment → Decision → Follow-up
+```
+
+Future:
+
+```text
+Continuous Data
+       ↓
+Monitoring Engine
+       ↓
+Change Detection
+       ↓
+Risk Assessment
+       ↓
+Decision Support
+       ↓
+Intervention
+       ↓
+Outcome Monitoring
+```
+
+This creates opportunities for proactive rather than purely reactive nutrition support.
+
+---
+
+# 26.21 Phase 5 — Population Nutrition Intelligence
+
+Once sufficient aggregated and governed data exists, NutriLogic could support population-level analytics.
+
+Potential applications include:
+
+* nutrition-risk surveillance;
+* geographic nutrition patterns;
+* intervention uptake;
+* population dietary trends;
+* demographic disparities;
+* resource planning.
+
+However, population analytics must be strictly separated from identifiable patient-level information.
+
+---
+
+# 26.22 Population Dashboard Architecture
+
+```text
+De-identified Data
+       │
+       ▼
+Analytics Pipeline
+       │
+       ▼
+Aggregated Indicators
+       │
+       ▼
+Population Knowledge Layer
+       │
+       ▼
+Dashboard
+```
+
+The architecture should prohibit accidental exposure of individual patient records through aggregate visualizations.
+
+---
+
+# 26.23 Kenyan Nutrition Intelligence
+
+A particularly valuable research direction is the development of a Kenyan nutrition intelligence layer.
+
+The system could eventually integrate:
+
+* Kenyan food composition information;
+* national nutrition guidance;
+* regional dietary patterns;
+* socioeconomic context;
+* seasonal food availability;
+* food affordability;
+* public-health indicators.
+
+This would extend NutriLogic beyond a generic nutrition expert system toward a context-aware Kenyan nutrition platform.
+
+The existing dissertation already positions Kenyan nutrition knowledge and Kenya MOH guidance as central to the system's knowledge-engineering contribution. 
+
+---
+
+# 26.24 Food and Dietary Recognition
+
+A future computer-vision component could assist with dietary assessment.
+
+A possible workflow is:
+
+```text
+Food Image
+    ↓
+Computer Vision Model
+    ↓
+Food Identification
+    ↓
+Ontology Mapping
+    ↓
+Portion Estimation
+    ↓
+Nutrient Estimation
+    ↓
+Nutrition Assessment
+```
+
+The output should remain probabilistic.
+
+The symbolic layer should therefore be able to represent uncertainty and request human confirmation where recognition confidence is insufficient.
+
+---
+
+# 26.25 Automated Knowledge Acquisition
+
+Knowledge engineering is currently dependent on controlled human authoring.
+
+Future research could investigate semi-automated knowledge acquisition from:
+
+* clinical guidelines;
+* systematic reviews;
+* nutrition research;
+* food databases;
+* government publications.
+
+The proposed pipeline is:
+
+```text
+Evidence Source
+      ↓
+Document Processing
+      ↓
+Concept Extraction
+      ↓
+Candidate Knowledge
+      ↓
+Clinical / Knowledge Review
+      ↓
+Validation
+      ↓
+Knowledge Module
+      ↓
+Versioned Release
+```
+
+The critical design decision is that **automated extraction should produce candidate knowledge, not automatically publish clinical rules**.
+
+---
+
+# 26.26 Guideline Update Pipeline
+
+Nutrition guidelines evolve.
+
+The knowledge architecture should therefore eventually support:
+
+```text
+New Guideline
+     ↓
+Evidence Identification
+     ↓
+Impact Analysis
+     ↓
+Candidate Rule Changes
+     ↓
+Clinical Review
+     ↓
+Validation
+     ↓
+Regression Testing
+     ↓
+Versioned Knowledge Release
+```
+
+This provides a controlled mechanism for updating clinical knowledge without uncontrolled modification of the production knowledge base.
+
+---
+
+# 26.27 Knowledge Provenance Evolution
+
+Future knowledge modules should maintain provenance at the rule and concept level.
+
+A knowledge artefact should ideally record:
+
+* source;
+* publication;
+* issuing authority;
+* effective date;
+* review date;
+* version;
+* author;
+* reviewer;
+* evidence classification;
+* superseded knowledge.
+
+This would strengthen auditability and support future clinical governance.
+
+---
+
+# 26.28 Advanced Clinical Governance
+
+As system capability increases, governance must evolve accordingly.
+
+Future governance should address:
+
+* model governance;
+* dataset governance;
+* algorithm versioning;
+* clinical review;
+* bias monitoring;
+* safety monitoring;
+* incident management;
+* change approval;
+* auditability;
+* rollback.
+
+The existing governance architecture already treats governance as a cross-cutting concern spanning clinical safety, knowledge management, privacy, security, auditability, and quality assurance. 
+
+Future AI capabilities should therefore extend this governance model rather than create a separate unmanaged AI subsystem.
+
+---
+
+# 26.29 Bias and Fairness Monitoring
+
+A future learning-enabled system should evaluate whether model performance varies across relevant population groups.
+
+Potential dimensions may include:
+
+* age;
+* sex;
+* geographic context;
+* socioeconomic context;
+* dietary patterns.
+
+The exact protected or clinically relevant characteristics must be determined according to the intended deployment context and applicable ethical requirements.
+
+The objective is not necessarily identical predictions across groups.
+
+Rather, the system should identify unjustified disparities in performance or recommendations.
+
+---
+
+# 26.30 Model Lifecycle Management
+
+Machine-learning models require controlled lifecycle management.
+
+A future model registry should track:
+
+```text
+Model
+ ├── Version
+ ├── Training Dataset
+ ├── Features
+ ├── Metrics
+ ├── Validation
+ ├── Approval
+ ├── Deployment Status
+ └── Retirement Status
+```
+
+A model should never silently change the behaviour of a clinical decision-support system.
+
+---
+
+# 26.31 Knowledge and Model Version Compatibility
+
+The future system must consider compatibility between model versions and knowledge versions.
+
+For example:
+
+```text
+Model v2.1
+      +
+Knowledge v4.3
+      +
+Ontology v3.0
+```
+
+should be treated as a specific reproducible configuration.
+
+This allows an historical recommendation to be reconstructed using the exact system state under which it was generated.
+
+---
+
+# 26.32 Advanced Auditability
+
+The future platform should provide complete decision provenance.
+
+A decision record may eventually contain:
+
+```text
+Decision ID
+Patient Context Version
+Assessment Version
+Ontology Version
+Knowledge Version
+Rule Version
+Model Version
+Inference Trace
+Recommendation
+Explanation
+Timestamp
+System Actor
+Human Reviewer
+```
+
+This would significantly strengthen retrospective analysis and incident investigation.
+
+---
+
+# 26.33 Distributed and Cloud Deployment
+
+As workload increases, NutriLogic could evolve from a single deployment toward distributed infrastructure.
+
+Potential components include:
+
+* API services;
+* inference workers;
+* asynchronous job queues;
+* database clusters;
+* knowledge services;
+* analytics services;
+* model-serving infrastructure.
+
+However, microservices should not be introduced merely because they are fashionable.
+
+The modular monolithic architecture should remain the default until operational evidence demonstrates that independent service scaling provides meaningful value.
+
+---
+
+# 26.34 Event-Driven Expansion
+
+The existing architecture already supports event-driven collaboration.
+
+Future events could include:
+
+* `AssessmentCompleted`;
+* `InferenceCompleted`;
+* `RecommendationGenerated`;
+* `GoalUpdated`;
+* `MonitoringAlertRaised`;
+* `KnowledgeModulePublished`;
+* `ModelVersionApproved`.
+
+These events can support asynchronous processing without forcing the clinical domain to depend directly on infrastructure services.
+
+---
+
+# 26.35 Research Platform Evolution
+
+Beyond clinical deployment, NutriLogic can become a research platform for experiments in:
+
+* explainable AI;
+* neuro-symbolic reasoning;
+* clinical knowledge engineering;
+* nutrition informatics;
+* personalized nutrition;
+* human-AI collaboration;
+* knowledge graph reasoning;
+* clinical recommendation systems.
+
+The modular architecture makes controlled experimentation possible without requiring complete system redesign.
+
+---
+
+# 26.36 Future Research Experiments
+
+Potential research experiments include:
+
+### Experiment 1 — Symbolic vs Neural
+
+Compare symbolic, neural, and hybrid approaches.
+
+### Experiment 2 — Explainability
+
+Measure whether hybrid explanations improve user understanding compared with opaque predictions.
+
+### Experiment 3 — Personalization
+
+Evaluate whether contextual information improves recommendation appropriateness.
+
+### Experiment 4 — Knowledge Updates
+
+Measure the effect of modular knowledge updates on system maintenance effort.
+
+### Experiment 5 — Longitudinal Prediction
+
+Evaluate whether historical monitoring data improves outcome prediction.
+
+### Experiment 6 — Human-AI Collaboration
+
+Measure whether clinicians using NutriLogic perform nutrition decision tasks more accurately or efficiently.
+
+These experiments belong to future research rather than being claimed as completed work.
+
+---
+
+# 26.37 Evolution Prioritization
+
+Not every proposed extension should be implemented immediately.
+
+A prioritization framework should consider:
+
+[
+Priority =
+f(Value,\ Feasibility,\ Risk,\ Dependency,\ Evidence)
+]
+
+A feature with high potential value but high clinical risk and weak evidence should not automatically receive the highest priority.
+
+---
+
+# 26.38 Proposed Priority Matrix
+
+| Extension                      | Value     | Complexity | Risk      | Priority            |
+| ------------------------------ | --------- | ---------- | --------- | ------------------- |
+| Platform hardening             | High      | Medium     | Low       | Very High           |
+| Knowledge update pipeline      | High      | Medium     | Medium    | Very High           |
+| ML risk prediction             | High      | High       | High      | High                |
+| Neuro-symbolic fusion          | Very High | Very High  | High      | High                |
+| FHIR interoperability          | High      | High       | Medium    | High                |
+| Mobile integration             | Medium    | Medium     | Medium    | Medium              |
+| Wearable integration           | High      | High       | High      | Medium              |
+| Population analytics           | High      | High       | High      | Medium              |
+| Automated knowledge extraction | High      | Very High  | Very High | Controlled research |
+| Food-image recognition         | Medium    | High       | Medium    | Research            |
+
+The priorities should be revised after empirical evaluation and stakeholder consultation.
+
+---
+
+# 26.39 Evolution Dependencies
+
+The proposed extensions depend upon one another.
+
+```text
+Platform Hardening
+        │
+        ├───────────────┐
+        ▼               ▼
+Knowledge Governance   Interoperability
+        │               │
+        ▼               ▼
+     ML Infrastructure
+        │
+        ▼
+Neuro-Symbolic Fusion
+        │
+   ┌────┴─────┐
+   ▼          ▼
+Continuous   Advanced
+Monitoring   Personalization
+   │          │
+   └────┬─────┘
+        ▼
+Population Intelligence
+```
+
+This dependency structure prevents advanced capabilities from being implemented before the supporting infrastructure exists.
+
+---
+
+# 26.40 Five-Year Evolution Vision
+
+A possible long-term trajectory is:
+
+### Stage 1 — Current
+
+Knowledge-centric symbolic CNDSS.
+
+### Stage 2
+
+Production-hardened clinical decision-support platform.
+
+### Stage 3
+
+Machine-learning augmented personalization.
+
+### Stage 4
+
+Integrated neuro-symbolic decision support.
+
+### Stage 5
+
+Interoperable and continuously monitored clinical ecosystem.
+
+### Stage 6
+
+Population-scale nutrition intelligence and research platform.
+
+The exact timescale should remain flexible because clinical validation, regulatory requirements, funding, and research results may alter priorities.
+
+---
+
+# 26.41 Architectural Principles for Future Development
+
+Future developers should preserve the following principles:
+
+1. **Symbolic safety remains authoritative.**
+2. **Machine learning augments rather than silently replaces domain knowledge.**
+3. **Every clinical recommendation remains traceable.**
+4. **Knowledge changes are versioned.**
+5. **Models are versioned.**
+6. **Patient data remains governed.**
+7. **External integrations use explicit adapters.**
+8. **Clinical-risk boundaries determine automation levels.**
+9. **Human oversight remains available for high-risk decisions.**
+10. **New functionality must remain testable independently.**
+11. **Research claims must remain proportional to empirical evidence.**
+12. **Architectural complexity must be justified by measurable benefit.**
+
+---
+
+# 26.42 Future Limitations
+
+The proposed roadmap contains substantial uncertainties.
+
+First, neural models may introduce performance and interpretability trade-offs.
+
+Second, obtaining sufficiently large and representative Kenyan nutrition datasets may be difficult.
+
+Third, integrating heterogeneous clinical systems may introduce interoperability challenges.
+
+Fourth, wearable and sensor data may contain noise and missing values.
+
+Fifth, automated knowledge acquisition may introduce errors that are difficult to detect.
+
+Sixth, population analytics may create additional privacy and governance risks.
+
+Seventh, clinical deployment introduces requirements that cannot be fully resolved through software architecture alone.
+
+Consequently, every future capability requires independent validation before clinical adoption.
+
+---
+
+# 26.43 Future Evaluation Requirements
+
+Each future extension should introduce its own evaluation criteria.
+
+| Extension                       | Required Evaluation                       |
+| ------------------------------- | ----------------------------------------- |
+| ML prediction                   | Predictive performance, calibration, bias |
+| Neuro-symbolic reasoning        | Accuracy, fidelity, explainability        |
+| FHIR                            | Interoperability and conformance          |
+| Mobile                          | Usability and reliability                 |
+| Wearables                       | Sensor validity and robustness            |
+| Population analytics            | Statistical validity and privacy          |
+| Automated knowledge acquisition | Extraction precision and expert agreement |
+| Guideline updates               | Change correctness and regression safety  |
+| Model lifecycle                 | Reproducibility and version control       |
+
+No future capability should be considered production-ready merely because it technically works.
+
+---
+
+# 26.44 Future Clinical Validation
+
+The most important future step beyond the current engineering evaluation is prospective clinical validation.
+
+A mature evaluation pathway could progress through:
+
+```text
+Software Testing
+      ↓
+Controlled Case Evaluation
+      ↓
+Expert Review
+      ↓
+Usability Study
+      ↓
+Pilot Deployment
+      ↓
+Prospective Clinical Study
+      ↓
+Real-World Evaluation
+```
+
+Each stage should have explicit entry and exit criteria.
+
+The dissertation should not claim clinical efficacy until appropriate prospective evidence exists.
+
+---
+
+# 26.45 Future Governance Gate
+
+Before introducing a major clinical capability, the following gate should be applied:
+
+```text
+New Capability
+      │
+      ▼
+Technical Validation
+      │
+      ▼
+Knowledge Validation
+      │
+      ▼
+Clinical Review
+      │
+      ▼
+Safety Assessment
+      │
+      ▼
+Security / Privacy Review
+      │
+      ▼
+User Evaluation
+      │
+      ▼
+Deployment Approval
+```
+
+This provides a repeatable governance mechanism for system evolution.
+
+---
+
+# 26.46 Evolution Traceability
+
+Every future capability should be traceable to:
+
+```text
+Research Need
+     ↓
+Research Question
+     ↓
+System Requirement
+     ↓
+Architectural Extension
+     ↓
+Implementation
+     ↓
+Evaluation
+     ↓
+Evidence
+```
+
+This ensures that future development remains research-driven rather than becoming uncontrolled feature accumulation.
+
+---
+
+# 26.47 Chapter 26 Architecture Decision Record
+
+## ADR-026: Controlled Evolution Toward a Neuro-Symbolic Clinical Intelligence Platform
+
+### Status
+
+**Accepted**
+
+### Context
+
+NutriLogic has been designed as a modular knowledge-centric CNDSS with explicit symbolic reasoning, explainability, governance, and extensibility.
+
+The original implementation roadmap identifies neuro-symbolic integration, machine-learning augmentation, predictive analytics, population dashboards, mobile integration, FHIR interoperability, and wearable-device integration as advanced capabilities. 
+
+Introducing these capabilities without architectural controls could undermine the transparency and safety properties established by the current system.
+
+### Decision
+
+Future evolution shall proceed incrementally through controlled extensions while preserving:
+
+* symbolic clinical constraints;
+* knowledge provenance;
+* explanation traceability;
+* versioned knowledge;
+* model governance;
+* security;
+* privacy;
+* auditability;
+* human oversight for appropriately defined high-risk decisions.
+
+### Rationale
+
+The approach allows NutriLogic to evolve toward a neuro-symbolic and learning-enabled platform without abandoning the knowledge-centric architecture that constitutes a major contribution of the dissertation.
+
+### Consequences
+
+**Positive**
+
+* Preserves architectural continuity.
+* Enables future AI research.
+* Supports interoperability.
+* Provides a controlled route toward continuous monitoring.
+* Enables population-level research.
+* Protects explainability and governance.
+
+**Trade-offs**
+
+* Future architecture becomes more complex.
+* ML introduces additional validation requirements.
+* Interoperability introduces external dependencies.
+* Continuous monitoring increases data-management requirements.
+* Clinical deployment requires evidence beyond software testing.
+
+---
+
+# 26.48 Research Contribution of the Evolution Roadmap
+
+The roadmap itself is not presented as an empirical contribution.
+
+Its contribution is architectural.
+
+It establishes how the implemented knowledge-centric system can evolve without requiring fundamental replacement of its core reasoning architecture.
+
+The roadmap therefore demonstrates that:
+
+* symbolic reasoning can remain a stable foundation;
+* neural models can be introduced as controlled augmentation;
+* external healthcare systems can be integrated through adapters;
+* mobile and sensor systems can become additional data sources;
+* population analytics can operate on governed aggregated data;
+* knowledge acquisition can become progressively automated;
+* and governance can evolve alongside system intelligence.
+
+---
+
+# 26.49 Final Dissertation Architecture
+
+The completed architectural progression can now be represented as:
+
+```text
+                    NUTRILOGIC
+                        │
+                        ▼
+              Requirements & Objectives
+                        │
+                        ▼
+               Architectural Principles
+                        │
+                        ▼
+                Clinical Architecture
+                        │
+          ┌─────────────┼─────────────┐
+          ▼             ▼             ▼
+     Domain Model    Knowledge      Governance
+                     Model
+          │             │             │
+          └─────────────┼─────────────┘
+                        ▼
+                Integration Layer
+                        │
+             ┌──────────┼──────────┐
+             ▼          ▼          ▼
+          Database      API      Frontend
+             │          │          │
+             └──────────┼──────────┘
+                        ▼
+                    Deployment
+                        │
+                        ▼
+                 Verification
+                        │
+                        ▼
+                   Evaluation
+                        │
+                        ▼
+              Future Evolution
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+   Neural Models   Interoperability   Continuous Data
+        │               │                │
+        └───────────────┼────────────────┘
+                        ▼
+              Neuro-Symbolic CNDSS
+                        │
+                        ▼
+              Clinical Intelligence
+                        │
+                        ▼
+             Population Intelligence
+```
+
+---
+
+# 26.50 Chapter Summary
+
+This chapter has established the future evolution roadmap for NutriLogic.
+
+The roadmap begins with platform hardening before progressively introducing machine-learning augmentation, neuro-symbolic integration, healthcare interoperability, mobile interfaces, wearable data, population analytics, automated knowledge acquisition, and advanced clinical governance.
+
+The proposed architecture deliberately avoids replacing symbolic reasoning with opaque machine learning.
+
+Instead, future predictive models are positioned as controlled sources of evidence that operate alongside the ontology, knowledge graph, rule base, and symbolic reasoning engine.
+
+This preserves the central architectural properties established throughout the dissertation: explainability, traceability, modularity, governance, and clinical safety.
+
+The roadmap also establishes a critical methodological boundary. Future capabilities are presented as **research and engineering directions**, not as completed system capabilities. In particular, the dissertation does not claim empirical validation of neural models, clinical efficacy, real-world FHIR deployment, wearable integration, or population-scale operation unless those capabilities have actually been implemented and evaluated.
+
+The future system therefore evolves through a controlled sequence:
+
+```text
+Symbolic CNDSS
+      ↓
+Production-Hardened CNDSS
+      ↓
+ML-Augmented CNDSS
+      ↓
+Neuro-Symbolic CNDSS
+      ↓
+Interoperable CNDSS
+      ↓
+Continuously Monitored CNDSS
+      ↓
+Population Nutrition Intelligence Platform
+```
+
+This provides a technically coherent path from the present NutriLogic implementation toward a larger research and clinical ecosystem while preserving the principles upon which the dissertation is founded.
+
+---
